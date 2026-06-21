@@ -22,7 +22,7 @@ def main():
 
     for i, patient in enumerate(patients):
         patient_id = patient.get("PatientNo", f"row_{i}")
-        print(f"  → {patient_id} ({i + 1}/{len(patients)})")
+        print(f"  -> {patient_id} ({i + 1}/{len(patients)})")
 
         assessment = process_patient(chain, patient)
 

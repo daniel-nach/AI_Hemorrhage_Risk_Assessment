@@ -15,7 +15,10 @@ def process_patient(chain, patient_dict: dict) -> dict:
     result = chain.invoke({"patient_data": patient_str})
     text = result.content if hasattr(result, "content") else str(result)
 
-    risk_level = _extract(text, "RISK_LEVEL")
+    risk_level = _extract(text, "RISK_LEVEL").upper()
+    # Normalize multi-word value
+    if "INSUFFICIENT" in risk_level:
+        risk_level = "INSUFFICIENT DATA"
     reasoning = _extract(text, "REASONING")
 
     return {"risk_level": risk_level, "reasoning": reasoning}
