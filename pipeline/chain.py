@@ -1,21 +1,26 @@
+import re
+
+
 def build_chain(llm, prompt):
-    """
-    Connects the prompt template to the LLM using LangChain's pipe operator.
-    Calling chain.invoke({...}) fills the prompt then sends it to the LLM.
-    """
     return prompt | llm
 
 
-def process_patient(chain, patient_dict: dict, guidelines: str) -> str:
+def process_patient(chain, patient_dict: dict) -> dict:
     """
-    Runs the chain for a single patient and returns the recommendation text.
+    Runs the chain for a single patient.
+    Returns a dict with 'risk_level' and 'reasoning'.
     """
     patient_str = "\n".join(f"{k}: {v}" for k, v in patient_dict.items())
 
-    result = chain.invoke({
-        "guidelines": guidelines,
-        "patient_data": patient_str,
-    })
+    result = chain.invoke({"patient_data": patient_str})
+    text = result.content if hasattr(result, "content") else str(result)
 
-    # ChatGroq returns a message object; .content extracts the text
-    return result.content if hasattr(result, "content") else str(result)
+    risk_level = _extract(text, "RISK_LEVEL")
+    reasoning = _extract(text, "REASONING")
+
+    return {"risk_level": risk_level, "reasoning": reasoning}
+
+
+def _extract(text: str, field: str) -> str:
+    match = re.search(rf"{field}:\s*(.+)", text, re.IGNORECASE)
+    return match.group(1).strip() if match else "UNKNOWN"

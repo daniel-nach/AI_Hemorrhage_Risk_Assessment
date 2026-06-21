@@ -1,25 +1,20 @@
 from langchain.prompts import PromptTemplate
 
-TEMPLATE = """You are a clinical decision support assistant for Parkinson's disease management.
+TEMPLATE = """You are a clinical decision support assistant specializing in Parkinson's disease.
 
-Below are the clinical guidelines you must follow strictly:
----
-{guidelines}
----
+Using your medical knowledge, assess the hemorrhage risk for the following patient.
 
-Here is the data for one patient:
+Patient data:
 {patient_data}
 
-Based solely on the guidelines above, provide:
-1. A list of recommended actions for this patient
-2. Which specific guideline section applies to each recommendation
-3. Any flags or urgent alerts (e.g., fall risk, medication threshold exceeded)
+Respond in this exact format:
 
-Be specific and cite the guidelines. Do not make recommendations not supported by the guidelines."""
+RISK_LEVEL: <HIGH, MEDIUM, or LOW>
+REASONING: <A concise explanation of the key factors driving this risk level, citing specific values from the patient data>"""
 
 
 def build_prompt() -> PromptTemplate:
     return PromptTemplate(
-        input_variables=["guidelines", "patient_data"],
+        input_variables=["patient_data"],
         template=TEMPLATE,
     )

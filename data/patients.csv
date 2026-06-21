@@ -1,0 +1,11 @@
+patient_id,age,sex,years_since_diagnosis,tremor_severity,fall_history_past_year,anticoagulant_use,anticoagulant_name,systolic_bp,diastolic_bp,cognitive_score_moca,atrial_fibrillation,diabetes,levodopa_dose_mg_day,comorbidities
+P001,72,M,8,severe,3,yes,warfarin,158,94,22,yes,no,600,hypertension
+P002,65,F,3,mild,0,no,,122,78,28,no,no,300,none
+P003,80,M,12,severe,5,yes,apixaban,170,100,18,yes,yes,800,hypertension; diabetes; heart failure
+P004,58,F,2,moderate,1,no,,130,82,27,no,no,400,none
+P005,76,M,9,moderate,2,yes,warfarin,145,88,24,yes,no,500,atrial fibrillation
+P006,69,F,6,mild,0,no,,118,74,29,no,no,350,none
+P007,83,M,15,severe,7,yes,rivaroxaban,180,105,15,yes,yes,900,hypertension; diabetes; chronic kidney disease
+P008,61,F,4,moderate,1,no,,135,85,26,no,yes,450,diabetes
+P009,74,M,10,severe,4,yes,warfarin,162,96,20,yes,no,700,hypertension; atrial fibrillation
+P010,55,F,1,mild,0,no,,120,76,30,no,no,250,none
