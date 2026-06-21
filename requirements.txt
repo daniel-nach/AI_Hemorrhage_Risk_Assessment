@@ -2,4 +2,5 @@ langchain
 langchain-groq
 langchain-ollama
 pandas
+openpyxl
 python-dotenv
