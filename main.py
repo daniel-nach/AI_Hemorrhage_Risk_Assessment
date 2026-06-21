@@ -17,25 +17,31 @@ def main():
     prompt = build_prompt()
     chain = build_chain(llm, prompt)
 
-    print(f"Processing {len(patients)} patient visits...")
+    print(f"Processing {len(patients)} patients...")
     results = []
 
-    for i, patient in enumerate(patients):
-        patient_id = patient.get("PatientNo", f"row_{i}")
-        print(f"  -> {patient_id} ({i + 1}/{len(patients)})")
+    try:
+        for i, patient in enumerate(patients):
+            patient_id = patient.get("patient_id", f"row_{i}")
+            print(f"  -> {patient_id} ({i + 1}/{len(patients)})")
 
-        assessment = process_patient(chain, patient)
+            assessment = process_patient(chain, patient)
 
-        results.append({
-            "patient_id": patient_id,
-            "hemorrhage_risk": assessment["risk_level"],
-            "reasoning": assessment["reasoning"],
-        })
+            results.append({
+                "patient_id": patient_id,
+                "hemorrhage_risk": assessment["risk_level"],
+                "reasoning": assessment["reasoning"],
+            })
+    except Exception as e:
+        print(f"\nStopped at patient {i + 1}/{len(patients)}: {e}")
+        if not results:
+            raise
+        print(f"Saving {len(results)} completed results...")
 
     os.makedirs("output", exist_ok=True)
     df = pd.DataFrame(results)
     df.to_csv(OUTPUT_CSV, index=False)
-    print(f"\nDone. Results saved to {OUTPUT_CSV}")
+    print(f"\nDone. Results saved to {OUTPUT_CSV} ({len(results)}/{len(patients)} patients)")
 
     print("\n--- Summary ---")
     for r in results:

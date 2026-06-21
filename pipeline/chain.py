@@ -8,11 +8,10 @@ def build_chain(llm, prompt):
 def process_patient(chain, patient_dict: dict) -> dict:
     """
     Runs the chain for a single patient.
+    patient_dict must have 'patient_id' and 'summary' keys (produced by loader).
     Returns a dict with 'risk_level' and 'reasoning'.
     """
-    patient_str = "\n".join(f"{k}: {v}" for k, v in patient_dict.items())
-
-    result = chain.invoke({"patient_data": patient_str})
+    result = chain.invoke({"patient_data": patient_dict["summary"]})
     text = result.content if hasattr(result, "content") else str(result)
 
     risk_level = _extract(text, "RISK_LEVEL").upper()
