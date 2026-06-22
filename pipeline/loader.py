@@ -1,5 +1,7 @@
 import pandas as pd
-import numpy as np
+
+# If none of these are present, we can't assess risk
+CRITICAL_FIELDS = {"Hb", "SysBP", "DiaBP", "Pulse", "UrineProtein"}
 
 CLINICAL_COLUMNS = [
     "PatientNo", "DOB", "Sex", "VisitDate", "VisitType",
@@ -38,7 +40,12 @@ def load_patients(file_path: str) -> list[dict]:
             if not series.empty:
                 latest[col] = series.iloc[-1]
 
+        insufficient = not any(k in latest for k in CRITICAL_FIELDS)
         patient_str = "\n".join(f"{k}: {v}" for k, v in latest.items())
-        patients.append({"patient_id": patient_no, "summary": patient_str})
+        patients.append({
+            "patient_id": patient_no,
+            "summary": patient_str,
+            "insufficient_data": insufficient,
+        })
 
     return patients

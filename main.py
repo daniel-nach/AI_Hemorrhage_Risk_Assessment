@@ -25,6 +25,14 @@ def main():
             patient_id = patient.get("patient_id", f"row_{i}")
             print(f"  -> {patient_id} ({i + 1}/{len(patients)})")
 
+            if patient["insufficient_data"]:
+                results.append({
+                    "patient_id": patient_id,
+                    "hemorrhage_risk": "INSUFFICIENT DATA",
+                    "reasoning": "No critical fields (Hb, SysBP, DiaBP, Pulse, UrineProtein) recorded.",
+                })
+                continue
+
             assessment = process_patient(chain, patient)
 
             results.append({

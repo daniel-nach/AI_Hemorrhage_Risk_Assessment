@@ -38,14 +38,12 @@ Blood Loss:
 - HIGH:             at least one HIGH risk factor is present
 - MEDIUM:           no HIGH risk factors, but at least one MEDIUM risk factor
 - LOW:              all available values are within normal ranges
-- INSUFFICIENT DATA: Hb, SysBP, DiaBP, Pulse, and UrineProtein are ALL missing
-
 --- PATIENT DATA (most recent recorded value per field) ---
 {patient_data}
 
 Respond in this exact format:
 
-RISK_LEVEL: <HIGH, MEDIUM, LOW, or INSUFFICIENT DATA>
+RISK_LEVEL: <HIGH, MEDIUM, or LOW>
 REASONING: <List which specific values triggered which risk factors. Be brief and cite the numbers.>"""
 
 
