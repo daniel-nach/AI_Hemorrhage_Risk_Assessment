@@ -41,10 +41,9 @@ def load_patients(file_path: str) -> list[dict]:
                 latest[col] = series.iloc[-1]
 
         insufficient = not any(k in latest for k in CRITICAL_FIELDS)
-        patient_str = "\n".join(f"{k}: {v}" for k, v in latest.items())
         patients.append({
             "patient_id": patient_no,
-            "summary": patient_str,
+            "latest": latest,
             "insufficient_data": insufficient,
         })
 

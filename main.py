@@ -6,6 +6,7 @@ from pipeline.loader import load_patients
 from pipeline.prompt import build_prompt
 from pipeline.llm import get_llm
 from pipeline.chain import build_chain, process_patient
+from pipeline.classifier import evaluate_numeric_risk
 
 
 def main():
@@ -33,7 +34,9 @@ def main():
                 })
                 continue
 
-            assessment = process_patient(chain, patient)
+            numeric_risk, numeric_findings = evaluate_numeric_risk(patient["latest"])
+
+            assessment = process_patient(chain, patient, numeric_risk, numeric_findings)
 
             results.append({
                 "patient_id": patient_id,

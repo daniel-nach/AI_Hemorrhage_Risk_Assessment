@@ -1,54 +1,33 @@
 from langchain_core.prompts import PromptTemplate
 
-TEMPLATE = """You are a clinical decision support assistant specializing in maternal health and obstetric care.
+TEMPLATE = """You are a clinical decision support assistant specializing in maternal health.
 
-Assess the obstetric hemorrhage risk for the following patient using the thresholds below.
-Apply each threshold exactly as written. Do not use general reasoning to override a threshold.
+Numeric risk factors have already been evaluated by a rules engine and are listed below.
+Your job is to review the qualitative clinical notes and determine if they reveal any additional
+hemorrhage risk not captured by the numbers.
 
---- CLINICAL THRESHOLDS ---
-Hemoglobin (Hb):
-  - Hb < 7.0 g/dL          -> HIGH risk factor
-  - 7.0 <= Hb < 10.0        -> MEDIUM risk factor
-  - Hb >= 10.0              -> no risk factor
+--- NUMERIC ASSESSMENT (already computed) ---
+Baseline risk from numeric fields: {numeric_risk}
+Numeric findings:
+{numeric_findings}
 
-Blood Pressure:
-  - SysBP >= 160 OR DiaBP >= 110  -> HIGH risk factor
-  - SysBP 140-159 OR DiaBP 90-109 -> MEDIUM risk factor
-  - SysBP < 90                    -> HIGH risk factor (possible shock)
-  - Otherwise                     -> no risk factor
+--- QUALITATIVE FIELDS TO REVIEW ---
+{qualitative_data}
 
-Urine Protein:
-  - 3+ or 4+  -> HIGH risk factor
-  - 2+        -> MEDIUM risk factor
-  - Otherwise -> no risk factor
-
-Platelet count:
-  - < 100,000       -> HIGH risk factor
-  - 100,000-150,000 -> MEDIUM risk factor
-  - Otherwise       -> no risk factor
-
-Pulse:
-  - > 110 bpm -> HIGH risk factor
-  - Otherwise -> no risk factor
-
-Blood Loss:
-  - Any reported value -> MEDIUM risk factor minimum
-
---- RISK LEVEL RULES ---
-- HIGH:             at least one HIGH risk factor is present
-- MEDIUM:           no HIGH risk factors, but at least one MEDIUM risk factor
-- LOW:              all available values are within normal ranges
---- PATIENT DATA (most recent recorded value per field) ---
-{patient_data}
+--- YOUR TASK ---
+Based ONLY on the qualitative fields above, decide if the risk should be escalated beyond {numeric_risk}.
+You may escalate LOW -> MEDIUM, LOW -> HIGH, or MEDIUM -> HIGH if the qualitative data justifies it.
+You may NOT lower the risk below {numeric_risk}.
+If the qualitative fields are empty, normal, or unremarkable, keep the risk at {numeric_risk}.
 
 Respond in this exact format:
 
 RISK_LEVEL: <HIGH, MEDIUM, or LOW>
-REASONING: <List which specific values triggered which risk factors. Be brief and cite the numbers.>"""
+REASONING: <One or two sentences. Cite the numeric findings and any qualitative factors that changed the risk.>"""
 
 
 def build_prompt() -> PromptTemplate:
     return PromptTemplate(
-        input_variables=["patient_data"],
+        input_variables=["numeric_risk", "numeric_findings", "qualitative_data"],
         template=TEMPLATE,
     )
