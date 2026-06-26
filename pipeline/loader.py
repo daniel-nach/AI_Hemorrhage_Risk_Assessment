@@ -48,11 +48,22 @@ def load_patients(file_path: str) -> list[dict]:
 def _build_visit_history(visits: pd.DataFrame) -> str:
     lines = []
     visit_cols = [c for c in visits.columns if c not in ("PatientNo", "VisitDate")]
+    prev_date = None
 
     for i, (_, row) in enumerate(visits.iterrows(), start=1):
         date = row.get("VisitDate")
-        date_str = date.strftime("%Y-%m-%d") if pd.notna(date) else "unknown date"
-        lines.append(f"Visit {i} ({date_str}):")
+        date_str = date.strftime("%Y-%m-%d") if pd.notna(date) else None
+
+        if date_str and prev_date and pd.notna(date) and pd.notna(prev_date):
+            gap = (date - prev_date).days
+            if gap == 0:
+                header = f"Visit {i} ({date_str}, same day as previous visit):"
+            else:
+                header = f"Visit {i} ({date_str}, {gap} days after previous visit):"
+        else:
+            header = f"Visit {i} ({date_str or 'unknown date'}):"
+
+        lines.append(header)
 
         any_data = False
         for col in visit_cols:
@@ -63,5 +74,8 @@ def _build_visit_history(visits: pd.DataFrame) -> str:
 
         if not any_data:
             lines.append("  (no data recorded)")
+
+        if pd.notna(date):
+            prev_date = date
 
     return "\n".join(lines)
