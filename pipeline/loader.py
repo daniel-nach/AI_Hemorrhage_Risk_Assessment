@@ -54,14 +54,14 @@ def _build_visit_history(visits: pd.DataFrame) -> str:
         date = row.get("VisitDate")
         date_str = date.strftime("%Y-%m-%d") if pd.notna(date) else None
 
-        if date_str and prev_date and pd.notna(date) and pd.notna(prev_date):
+        if prev_date and pd.notna(date) and pd.notna(prev_date):
             gap = (date - prev_date).days
             if gap == 0:
-                header = f"Visit {i} ({date_str}, same day as previous visit):"
+                header = f"Visit {i} (same day as previous visit):"
             else:
-                header = f"Visit {i} ({date_str}, {gap} days after previous visit):"
+                header = f"Visit {i} ({gap} days after previous visit):"
         else:
-            header = f"Visit {i} ({date_str or 'unknown date'}):"
+            header = f"Visit {i}:"
 
         lines.append(header)
 

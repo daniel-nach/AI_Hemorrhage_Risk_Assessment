@@ -1,4 +1,5 @@
 import os
+import sys
 import pandas as pd
 
 from config import PATIENTS_FILE, OUTPUT_CSV
@@ -8,9 +9,15 @@ from pipeline.llm import get_llm
 from pipeline.chain import build_chain, process_patient
 
 
-def main():
+def main(patient_id_filter: str = None):
     print("Loading patient data...")
     patients = load_patients(PATIENTS_FILE)
+
+    if patient_id_filter:
+        patients = [p for p in patients if p["patient_id"] == patient_id_filter]
+        if not patients:
+            print(f"No patient found with ID '{patient_id_filter}'")
+            return
 
     print("Setting up LangChain pipeline...")
     llm = get_llm(backend="groq")
@@ -57,4 +64,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    filter_id = sys.argv[1] if len(sys.argv) > 1 else None
+    main(patient_id_filter=filter_id)
