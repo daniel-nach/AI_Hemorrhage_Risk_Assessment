@@ -6,7 +6,6 @@ from pipeline.loader import load_patients
 from pipeline.prompt import build_prompt
 from pipeline.llm import get_llm
 from pipeline.chain import build_chain, process_patient
-from pipeline.classifier import evaluate_numeric_risk
 
 
 def main():
@@ -30,13 +29,11 @@ def main():
                 results.append({
                     "patient_id": patient_id,
                     "hemorrhage_risk": "INSUFFICIENT DATA",
-                    "reasoning": "No critical fields (Hb, SysBP, DiaBP, Pulse, UrineProtein) recorded.",
+                    "reasoning": "No critical fields (Hb, SysBP, DiaBP, Pulse, UrineProtein) recorded across any visit.",
                 })
                 continue
 
-            numeric_risk, numeric_findings = evaluate_numeric_risk(patient["latest"])
-
-            assessment = process_patient(chain, patient, numeric_risk, numeric_findings)
+            assessment = process_patient(chain, patient)
 
             results.append({
                 "patient_id": patient_id,

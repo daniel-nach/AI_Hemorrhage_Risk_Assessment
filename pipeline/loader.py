@@ -1,8 +1,5 @@
 import pandas as pd
 
-# If none of these are present, we can't assess risk
-CRITICAL_FIELDS = {"Hb", "SysBP", "DiaBP", "Pulse", "UrineProtein"}
-
 CLINICAL_COLUMNS = [
     "PatientNo", "DOB", "Sex", "VisitDate", "VisitType",
     "Temp", "SysBP", "DiaBP", "Pulse", "Resp", "O2Sat",
@@ -15,11 +12,14 @@ CLINICAL_COLUMNS = [
     "Urination", "MentalStatus", "Notes",
 ]
 
+# If none of these are present across any visit, we cannot assess risk
+CRITICAL_FIELDS = {"Hb", "SysBP", "DiaBP", "Pulse", "UrineProtein"}
+
 
 def load_patients(file_path: str) -> list[dict]:
     """
     Reads the xlsx, groups by patient, and returns one dict per patient
-    using the latest non-null value for each clinical field.
+    containing their full visit history sorted chronologically.
     """
     df = pd.read_excel(file_path)
     cols = [c for c in CLINICAL_COLUMNS if c in df.columns]
@@ -31,20 +31,37 @@ def load_patients(file_path: str) -> list[dict]:
 
     patients = []
     for patient_no, group in df.groupby("PatientNo"):
-        # For each column, take the last non-null value across all visits
-        latest = {}
-        for col in group.columns:
-            if col == "PatientNo":
-                continue
-            series = group[col].dropna()
-            if not series.empty:
-                latest[col] = series.iloc[-1]
-
-        insufficient = not any(k in latest for k in CRITICAL_FIELDS)
+        summary = _build_visit_history(group)
+        has_data = any(
+            col in group.columns and group[col].notna().any()
+            for col in CRITICAL_FIELDS
+        )
         patients.append({
             "patient_id": patient_no,
-            "latest": latest,
-            "insufficient_data": insufficient,
+            "summary": summary,
+            "insufficient_data": not has_data,
         })
 
     return patients
+
+
+def _build_visit_history(visits: pd.DataFrame) -> str:
+    lines = []
+    visit_cols = [c for c in visits.columns if c not in ("PatientNo", "VisitDate")]
+
+    for i, (_, row) in enumerate(visits.iterrows(), start=1):
+        date = row.get("VisitDate")
+        date_str = date.strftime("%Y-%m-%d") if pd.notna(date) else "unknown date"
+        lines.append(f"Visit {i} ({date_str}):")
+
+        any_data = False
+        for col in visit_cols:
+            val = row.get(col)
+            if val is not None and pd.notna(val) and str(val).strip() not in ("", "nan"):
+                lines.append(f"  {col}: {val}")
+                any_data = True
+
+        if not any_data:
+            lines.append("  (no data recorded)")
+
+    return "\n".join(lines)
