@@ -9,14 +9,24 @@ from pipeline.llm import get_llm
 from pipeline.chain import build_chain, process_patient
 
 
-def main(patient_id_filter: str = None):
+# Leave empty to run all patients, or list specific IDs to run only those.
+PATIENT_IDS = []
+
+
+def main(patient_ids: list[str] = None):
+    patient_ids = patient_ids if patient_ids is not None else PATIENT_IDS
+
     print("Loading patient data...")
     patients = load_patients(PATIENTS_FILE)
 
-    if patient_id_filter:
-        patients = [p for p in patients if p["patient_id"] == patient_id_filter]
+    if patient_ids:
+        patients = [p for p in patients if p["patient_id"] in patient_ids]
+        found = {p["patient_id"] for p in patients}
+        missing = [pid for pid in patient_ids if pid not in found]
+        if missing:
+            print(f"Warning: no patient found for ID(s): {', '.join(missing)}")
         if not patients:
-            print(f"No patient found with ID '{patient_id_filter}'")
+            print("No matching patients to process.")
             return
 
     print("Setting up LangChain pipeline...")
@@ -64,5 +74,6 @@ def main(patient_id_filter: str = None):
 
 
 if __name__ == "__main__":
-    filter_id = sys.argv[1] if len(sys.argv) > 1 else None
-    main(patient_id_filter=filter_id)
+    # IDs passed on the command line override PATIENT_IDS above.
+    cli_ids = sys.argv[1:]
+    main(patient_ids=cli_ids if cli_ids else None)
