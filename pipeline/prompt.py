@@ -6,9 +6,15 @@ CONTEXT
 All patients are pregnant women attending antenatal or postnatal clinic visits at a hospital in Kenya.
 Your task is to assess each patient's risk of obstetric hemorrhage.
 
-You are given the patient's COMPLETE recorded data: a block of patient-level facts that the system
-has already computed for you (age, BMI), followed by the full visit history with every recorded
-field, including free-text notes and postnatal observations. Use ALL of it.
+You are given the patient's COMPLETE recorded data:
+- A block of patient-level facts the system computed for you (age, BMI with category).
+- The full visit history with every recorded field, including free-text notes and postnatal
+  observations. The system has already classified each clinical value against pregnancy reference
+  ranges and appended a label in square brackets, e.g. "SysBP: 145 [BORDERLINE - hypertension]" or
+  "Hb: 8.0 [SEVERE - moderate anemia]". A value with NO bracket label is within the normal range.
+- A TRENDS block (when a stat has 2+ readings) giving the chronological sequence and its direction.
+Use ALL of it. Trust the bracket labels for the range classification — do not re-derive thresholds —
+but still read the raw numbers, because combinations and aggravating factors depend on them.
 
 Use your trained medical knowledge to reason about how these factors — both the direct hemorrhage
 indicators AND indirect ones — combine to affect risk. Many conditions interact: for instance,
@@ -17,14 +23,15 @@ pressure; anemia compounds the danger of any bleeding; infection can drive both 
 Draw on what you know about obstetric medicine to identify any such relationships suggested by the
 data (including the notes), not only the specific ones listed below.
 
-HOW RANGES MAP TO RISK
-- A value in the NORMAL band contributes NO risk. Do not escalate on a normal value.
-- A BORDERLINE value establishes at least MEDIUM risk (subject to trend reasoning below).
-- A SEVERE value establishes at least MEDIUM risk on its own and CANNOT be lowered by trend reasoning.
+HOW THE LABELS MAP TO RISK
+- A value with no label (normal) contributes NO risk. Do not escalate on a normal value.
+- A value labelled BORDERLINE establishes at least MEDIUM risk (subject to trend reasoning below).
+- A value labelled SEVERE establishes at least MEDIUM risk on its own and CANNOT be lowered by trends.
 - Two or more SEVERE values at any single visit => HIGH.
-- Co-occurring factors that point to a syndrome (e.g. severe/moderate anemia together with heavy
+- Co-occurring factors that point to a syndrome (e.g. moderate/severe anemia together with heavy
   proteinuria = severe preeclampsia) => HIGH.
-The exact NORMAL / BORDERLINE / SEVERE bands for each value are defined in REFERENCE RANGES below.
+A "normal, upper end" or "normal, lower end" label is still normal (no risk by itself), but flags that
+the value is near a threshold — useful when weighing aggravating factors.
 
 SEVERE VALUES SET A FLOOR
 A single severe value is dangerous on its own and establishes a MINIMUM risk level that trend
@@ -53,59 +60,9 @@ Use the following principles when interpreting repeated measurements:
   A single SEVERE reading is still severe (see the floor rule above); only MILD single readings
   should be softened for lack of a trend.
 
-REFERENCE RANGES (calibrated for pregnant women — NOT general adult norms)
-Use these bands to judge whether a value is normal, borderline, or severe. Treat them as clinical
-guidance, not rigid cutoffs, but do not label a value that falls in the NORMAL band as "elevated",
-"low", or "abnormal". A value only contributes to risk if it is BORDERLINE or SEVERE.
-
-Hemoglobin (Hb, g/dL):
-- Normal:     >= 11.0
-- Borderline: 9.0 - 10.9   (mild anemia; trend and context matter)
-- Severe:     < 9.0        (moderate anemia < 9.0; severe anemia < 7.0 — a real hemorrhage risk factor)
-  Do NOT call Hb 8 "slightly below normal" (it is moderate anemia), and do NOT call Hb 11.5+ low.
-
-Systolic BP (SysBP, mmHg):
-- Normal:     90 - 139     (anything in this range is NORMAL, not "mildly elevated")
-- Borderline: 140 - 159    (hypertension)
-- Severe:     >= 160, or < 90 (severe hypertension, or hypotension/possible shock)
-
-Diastolic BP (DiaBP, mmHg):
-- Normal:     60 - 89      (anything in this range is NORMAL, not "mildly elevated")
-- Borderline: 90 - 109     (hypertension)
-- Severe:     >= 110        (severe hypertension)
-
-Pulse (bpm):
-- Normal:     60 - 100     (resting HR is naturally higher in pregnancy; 100 is the top of normal)
-- Borderline: 101 - 110    (mild tachycardia)
-- Severe:     > 110        (tachycardia — possible hemorrhagic shock or infection), or < 50
-
-Oxygen saturation (O2Sat, %):
-- Normal:     >= 95
-- Borderline: 92 - 94
-- Severe:     < 92
-
-Platelet count (per microliter):
-- Normal:     >= 150,000
-- Borderline: 100,000 - 149,999
-- Severe:     < 100,000    (thrombocytopenia — coagulation/hemorrhage risk)
-
-Urine protein:
-- Normal:     0, trace, or 1+
-- Borderline: 2+           (significant proteinuria)
-- Severe:     3+ or 4+     (heavy proteinuria — marker of preeclampsia)
-
-Temperature (Temp, F):
-- Normal:     97.0 - 99.5
-- Borderline: 99.6 - 100.3
-- Severe:     >= 100.4 (fever — infection risk) or < 96.0
-
-Respiratory rate (Resp, breaths/min):
-- Normal:     12 - 20
-- Borderline: 21 - 24
-- Severe:     > 24 or < 10
-
-Blood loss:
-- Any reported blood loss is at least BORDERLINE; significant blood loss is SEVERE.
+- The TRENDS block gives you each repeated stat's sequence and direction (rising/falling/stable/
+  fluctuating). Use it, but apply the judgment above: a "falling" SysBP toward 90 is worrying, while
+  one abnormal reading that returns to normal is likely transient.
 
 CLINICAL PICTURE
 Beyond the individual ranges, weigh combinations and the overall picture:
@@ -146,11 +103,11 @@ How to use them (be disciplined — these MODULATE, they do not invent risk):
 DATA NOTES
 - Most patients have only vitals recorded; lab values like Hb and platelets are often missing.
 - Notes and qualitative fields are rarely filled in, but when present they may be meaningful — read them.
-- Age and BMI are pre-computed in the PATIENT-LEVEL FACTS block; you do not need to calculate them.
+- Age, BMI, value labels, and trends are all pre-computed for you; do not recompute them.
 - Reason only from the data that is present. Do not assume values that are not recorded.
 - Missing data should be acknowledged in your reasoning but should not by itself escalate the risk.
 
-WORKED EXAMPLES (these show the reasoning pattern; the real patient is further below)
+WORKED EXAMPLES (these show the reasoning pattern and the data format; the real patient is below)
 
 Example 1 — aggravating factor pushes an upper-normal value up:
 PATIENT-LEVEL FACTS (computed by the system):
@@ -158,15 +115,15 @@ PATIENT-LEVEL FACTS (computed by the system):
   BMI: 36.9 (Height 158 cm, Weight 92 kg) -> obese
 VISIT HISTORY:
 Visit 1:
-  SysBP: 138.0
-  DiaBP: 88.0
+  SysBP: 138.0 [normal, upper end]
+  DiaBP: 88.0 [normal, upper end]
   Hb: 10.5
   UrineProtein: 0
 RISK_LEVEL: MEDIUM
 REASONING: The computed BMI of 36.9 indicates obesity, which predisposes to and worsens hypertension.
-The BP of 138/88 sits at the very top of the normal band, and with obesity as an aggravating factor
-there is real potential for it to cross into hypertension; combined with mild anemia (Hb 10.5), this
-warrants MEDIUM rather than LOW.
+The BP of 138/88 is labelled normal but sits at the very top of the range, and with obesity as an
+aggravating factor there is real potential for it to cross into hypertension; this warrants MEDIUM
+rather than LOW.
 
 Example 2 — borderline primary value plus a strong aggravating factor escalates:
 PATIENT-LEVEL FACTS (computed by the system):
@@ -174,13 +131,13 @@ PATIENT-LEVEL FACTS (computed by the system):
   BMI: 27.5 (Height 160 cm, Weight 70 kg) -> overweight
 VISIT HISTORY:
 Visit 1:
-  SysBP: 144.0
-  DiaBP: 92.0
+  SysBP: 144.0 [BORDERLINE - hypertension]
+  DiaBP: 92.0 [BORDERLINE - hypertension]
   BloodGlucoseLevel: 190.0
   Hb: 10.8
 RISK_LEVEL: HIGH
-REASONING: BP of 144/92 is borderline hypertension, and the elevated blood glucose (190) points to
-diabetes/gestational diabetes — a strong aggravating factor that compounds hypertensive and
+REASONING: BP of 144/92 is labelled borderline hypertension, and the elevated blood glucose (190)
+points to diabetes/gestational diabetes — a strong aggravating factor that compounds hypertensive and
 preeclampsia risk. Combined with advanced maternal age (41), this recognized high-risk combination
 escalates the assessment to HIGH.
 
@@ -195,7 +152,7 @@ Visit 1:
   Hb: 12.4
   UrineProtein: 0
 RISK_LEVEL: LOW
-REASONING: The BMI of 36.0 indicates obesity, but every primary indicator is clearly normal — BP
+REASONING: The BMI of 36.0 indicates obesity, but every primary indicator is normal (no labels) — BP
 116/72, Hb 12.4, no proteinuria. An aggravating factor with no borderline or abnormal primary value
 does not by itself create hemorrhage risk, so the assessment is LOW.
 

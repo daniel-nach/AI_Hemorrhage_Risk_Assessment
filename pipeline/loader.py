@@ -1,5 +1,7 @@
 import pandas as pd
 
+from pipeline.classifier import classify, trend_direction, TREND_FIELDS, _f
+
 # Pure identifiers / administrative fields with no clinical value — excluded.
 # Everything else in the file (including Notes and postnatal fields) is passed to the AI.
 EXCLUDE_COLUMNS = {
@@ -33,7 +35,10 @@ def load_patients(file_path: str) -> list[dict]:
     for patient_no, group in df.groupby("PatientNo"):
         facts = _computed_facts(group)
         history = _build_visit_history(group)
+        trends = _build_trends(group)
         summary = f"{facts}\n\nVISIT HISTORY:\n{history}"
+        if trends:
+            summary += f"\n\n{trends}"
 
         has_data = any(
             col in group.columns and group[col].notna().any()
@@ -140,7 +145,11 @@ def _build_visit_history(visits: pd.DataFrame) -> str:
         for col in visit_cols:
             val = row.get(col)
             if val is not None and pd.notna(val) and str(val).strip() not in ("", "nan"):
-                lines.append(f"  {col}: {val}")
+                label = classify(col, val)
+                if label:
+                    lines.append(f"  {col}: {val} [{label}]")
+                else:
+                    lines.append(f"  {col}: {val}")
                 any_data = True
 
         if not any_data:
@@ -150,3 +159,21 @@ def _build_visit_history(visits: pd.DataFrame) -> str:
             prev_date = date
 
     return "\n".join(lines)
+
+
+def _build_trends(visits: pd.DataFrame) -> str:
+    """Consolidated chronological sequence + direction per numeric stat with >= 2 readings."""
+    lines = []
+    for col in TREND_FIELDS:
+        if col not in visits.columns:
+            continue
+        nums = [_f(v) for v in visits[col].tolist()]
+        nums = [n for n in nums if n is not None]
+        if len(nums) < 2:
+            continue
+        seq = " -> ".join(f"{n:g}" for n in nums)
+        lines.append(f"  {col}: {seq} ({trend_direction(nums)})")
+
+    if not lines:
+        return ""
+    return "TRENDS (values across visits, earliest to latest):\n" + "\n".join(lines)
