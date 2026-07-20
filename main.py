@@ -13,9 +13,18 @@ from pipeline.chain import build_chain, process_patient
 # Leave empty to run all patients, or list specific IDs to run only those.
 PATIENT_IDS = []
 
+# --- Test sample size ---------------------------------------------------------
+# How many patients to randomly select from each category. Change these two
+# numbers to resize the test run. NUM_LLM_PATIENTS is exactly how many patients
+# get sent to Groq (one API call each); the others are decided in code for free.
+# Set either to None to include ALL patients of that category.
+NUM_NON_LLM_PATIENTS = 50   # decided in code (auto LOW/HIGH + insufficient data)
+NUM_LLM_PATIENTS = 30       # sent to Groq for a reasoned assessment
+SAMPLE_SEED = 42            # fixed seed -> reproducible sample
+# -----------------------------------------------------------------------------
 
-def main(patients_file: str = None, patient_ids: list[str] = None,
-         limit: int = None, randomize: bool = False, seed: int = 42):
+
+def main(patients_file: str = None, patient_ids: list[str] = None):
     patients_file = patients_file or PATIENTS_FILE
     patient_ids = patient_ids if patient_ids is not None else PATIENT_IDS
 
@@ -31,8 +40,8 @@ def main(patients_file: str = None, patient_ids: list[str] = None,
         if not patients:
             print("No matching patients to process.")
             return
-
-    patients = select_sample(patients, limit, randomize, seed)
+    else:
+        patients = select_sample(patients, NUM_NON_LLM_PATIENTS, NUM_LLM_PATIENTS, SAMPLE_SEED)
 
     # How many patients does the code resolve on its own vs. need the LLM?
     auto = [p for p in patients if p["insufficient_data"] or p["auto_risk"]]
@@ -81,17 +90,28 @@ def main(patients_file: str = None, patient_ids: list[str] = None,
         print(f"  {level}: {n}")
 
 
-def select_sample(patients, limit, randomize, seed):
-    """Pick which patients to process: a random spread (seeded, reproducible) or the first N."""
-    if not limit or limit >= len(patients):
-        return patients
-    if randomize:
-        rng = random.Random(seed)
-        chosen = rng.sample(patients, limit)
-        # keep original order for stable output
-        order = {id(p): i for i, p in enumerate(patients)}
-        return sorted(chosen, key=lambda p: order[id(p)])
-    return patients[:limit]
+def _needs_llm(p):
+    return not p["insufficient_data"] and not p["auto_risk"]
+
+
+def select_sample(patients, num_non_llm, num_llm, seed):
+    """
+    Randomly select up to num_non_llm code-decided patients and up to num_llm
+    LLM-needing patients (seeded for reproducibility). None means 'all of that
+    category'. Output keeps the original ordering.
+    """
+    rng = random.Random(seed)
+    non_llm_pool = [p for p in patients if not _needs_llm(p)]
+    llm_pool = [p for p in patients if _needs_llm(p)]
+
+    def pick(pool, n):
+        if n is None or n >= len(pool):
+            return pool
+        return rng.sample(pool, n)
+
+    chosen = pick(non_llm_pool, num_non_llm) + pick(llm_pool, num_llm)
+    order = {id(p): i for i, p in enumerate(patients)}
+    return sorted(chosen, key=lambda p: order[id(p)])
 
 
 def _row(patient_id, risk, reasoning):
@@ -100,23 +120,17 @@ def _row(patient_id, risk, reasoning):
 
 if __name__ == "__main__":
     # CLI args (any order):
-    #   a .xlsx/.csv path      -> data file
-    #   a bare integer         -> cap how many patients to process
-    #   the word "random"      -> take a random sample of that size (else the first N)
-    #   anything else          -> patient ID filter
+    #   a .xlsx/.csv path -> data file
+    #   anything else     -> patient ID filter (runs exactly those patients)
+    # Sample size for a normal run is set by NUM_NON_LLM_PATIENTS / NUM_LLM_PATIENTS above.
     # Examples:
-    #   python main.py
-    #   python main.py data/mock_data_new.xlsx 300 random   # 300 random patients
-    #   python main.py data/mock_data_new.xlsx 50           # first 50
-    #   python main.py KCK0033218 KCK0033295                # specific patients
-    file_arg, limit_arg, randomize, ids = None, None, False, []
+    #   python main.py                                # sample from the default data file
+    #   python main.py data/mock_data_new.xlsx        # sample from the new dataset
+    #   python main.py KCK0033218 KCK0033295          # run specific patients only
+    file_arg, ids = None, []
     for arg in sys.argv[1:]:
         if arg.lower().endswith((".xlsx", ".csv")):
             file_arg = arg
-        elif arg.isdigit():
-            limit_arg = int(arg)
-        elif arg.lower() in ("random", "--random", "--sample"):
-            randomize = True
         else:
             ids.append(arg)
-    main(patients_file=file_arg, patient_ids=ids or None, limit=limit_arg, randomize=randomize)
+    main(patients_file=file_arg, patient_ids=ids or None)
