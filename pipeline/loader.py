@@ -1,6 +1,6 @@
 import pandas as pd
 
-from pipeline.classifier import classify, trend_direction, TREND_FIELDS, _f
+from pipeline.classifier import classify, severity, trend_direction, TREND_FIELDS, _f
 
 # Pure identifiers / administrative fields with no clinical value — excluded.
 # Everything else in the file (including Notes and postnatal fields) is passed to the AI.
@@ -14,6 +14,13 @@ PATIENT_LEVEL_COLUMNS = {"PatientNo", "DOB", "Sex"}
 
 # If none of these are present across any visit, we cannot assess risk.
 CRITICAL_FIELDS = {"Hb", "SysBP", "DiaBP", "Pulse", "UrineProtein"}
+
+# Free-text / qualitative fields the code cannot classify. If any are populated,
+# the patient is sent to the LLM rather than auto-classified.
+QUALITATIVE_FIELDS = {
+    "Notes", "GeneralCondition", "Mood", "Wellbeing", "Bonding",
+    "MentalStatus", "Perineum", "UterineFundus", "Urination", "Edema",
+}
 
 
 def load_patients(file_path: str) -> list[dict]:
@@ -44,13 +51,106 @@ def load_patients(file_path: str) -> list[dict]:
             col in group.columns and group[col].notna().any()
             for col in CRITICAL_FIELDS
         )
+        auto_risk, auto_reason = (None, None) if not has_data else _triage(group)
         patients.append({
             "patient_id": patient_no,
             "summary": summary,
             "insufficient_data": not has_data,
+            "auto_risk": auto_risk,      # 'LOW' / 'HIGH' decided in code, or None -> needs LLM
+            "auto_reason": auto_reason,
         })
 
     return patients
+
+
+def _triage(group: pd.DataFrame):
+    """
+    Decide high-confidence cases in code so we don't spend an LLM call on them.
+    Returns ('LOW', reason), ('HIGH', reason), or (None, None) meaning 'ask the LLM'.
+    """
+    # Per-visit severe counts and overall severity presence.
+    max_severe_in_a_visit = 0
+    has_severe = has_borderline = has_edge = False
+
+    for _, row in group.iterrows():
+        severe_this_visit = 0
+        for field in group.columns:
+            sev = severity(field, row.get(field))
+            if sev == "severe":
+                severe_this_visit += 1
+                has_severe = True
+            elif sev == "borderline":
+                has_borderline = True
+            elif sev == "edge":
+                has_edge = True
+        max_severe_in_a_visit = max(max_severe_in_a_visit, severe_this_visit)
+
+    # Auto-HIGH: two or more severe values at a single visit is unambiguous.
+    if max_severe_in_a_visit >= 2:
+        return "HIGH", "two or more severe values recorded at a single visit"
+
+    # Anything with a severe or borderline value needs the LLM's judgment (single
+    # severe = medium floor that may or may not escalate; borderline may be softened
+    # by a trend or escalated by an aggravating factor).
+    if has_severe or has_borderline:
+        return None, None
+
+    # Free-text/qualitative content -> the code can't judge it; defer to the LLM.
+    if _has_qualitative(group):
+        return None, None
+
+    # A directional trend on a tracked stat is a judgment call -> defer to the LLM.
+    if _has_directional_trend(group):
+        return None, None
+
+    # A near-threshold value combined with an aggravating factor can justify MEDIUM,
+    # so that combination goes to the LLM. Edge value alone (no aggravating factor)
+    # or aggravating factor alone (no edge value) stays low-confidence LOW.
+    if has_edge and _aggravating_present(group):
+        return None, None
+
+    return "LOW", "all values within normal range; no risk factors or worrying trends"
+
+
+def _has_qualitative(group: pd.DataFrame) -> bool:
+    for col in QUALITATIVE_FIELDS:
+        if col in group.columns and group[col].notna().any():
+            # treat non-empty strings as content
+            for v in group[col].dropna():
+                if str(v).strip() not in ("", "nan"):
+                    return True
+    return False
+
+
+def _has_directional_trend(group: pd.DataFrame) -> bool:
+    for col in TREND_FIELDS:
+        if col not in group.columns:
+            continue
+        nums = [n for n in (_f(v) for v in group[col].tolist()) if n is not None]
+        if len(nums) >= 2 and trend_direction(nums) in ("rising", "falling"):
+            return True
+    return False
+
+
+def _aggravating_present(group: pd.DataFrame) -> bool:
+    age = _compute_age(group)
+    if age is not None and (age >= 40 or age <= 17):
+        return True
+
+    bmi = _bmi_value(group)
+    if bmi is not None and (bmi >= 30 or bmi < 18.5):
+        return True
+
+    for col in ("BloodGlucoseLevel", "BedSideGlucose"):
+        val = _f(_latest(group, col))
+        if val is not None and val > 140:  # elevated random glucose
+            return True
+
+    ug = _latest(group, "UrineGlucose")
+    if ug is not None and str(ug).strip() not in ("", "nan", "0", "0.0", "Negative", "negative"):
+        return True
+
+    return False
 
 
 def _latest(group: pd.DataFrame, col: str):
@@ -95,17 +195,21 @@ def _compute_age(group: pd.DataFrame):
     return years if 0 < years < 120 else None
 
 
+def _bmi_value(group: pd.DataFrame):
+    """BMI as a float, or None if height/weight unavailable."""
+    h_cm = _f(_latest(group, "Height"))
+    w_kg = _f(_latest(group, "Weight"))
+    if h_cm is None or w_kg is None or h_cm <= 0 or w_kg <= 0:
+        return None
+    return w_kg / ((h_cm / 100) ** 2)
+
+
 def _compute_bmi(group: pd.DataFrame):
-    height = _latest(group, "Height")  # cm
-    weight = _latest(group, "Weight")  # kg
-    try:
-        h_cm = float(height)
-        w_kg = float(weight)
-    except (TypeError, ValueError):
+    bmi = _bmi_value(group)
+    if bmi is None:
         return None
-    if h_cm <= 0 or w_kg <= 0:
-        return None
-    bmi = w_kg / ((h_cm / 100) ** 2)
+    h_cm = _f(_latest(group, "Height"))
+    w_kg = _f(_latest(group, "Weight"))
     return f"  BMI: {bmi:.1f} (Height {h_cm:g} cm, Weight {w_kg:g} kg) -> {_bmi_category(bmi)}"
 
 

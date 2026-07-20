@@ -182,6 +182,23 @@ def classify(field: str, value) -> str | None:
     return fn(value) if fn else None
 
 
+def severity(field: str, value) -> str | None:
+    """
+    Coarse severity tier for triage: 'severe', 'borderline', 'edge' (normal but
+    near a threshold), or None (plainly normal / unclassified).
+    """
+    label = classify(field, value)
+    if not label:
+        return None
+    if label.startswith("SEVERE"):
+        return "severe"
+    if label.startswith("BORDERLINE"):
+        return "borderline"
+    if label.startswith("normal"):  # "normal, upper/lower end"
+        return "edge"
+    return None
+
+
 # --- trend computation across visits ---
 
 # Numeric stats worth tracking over time.
