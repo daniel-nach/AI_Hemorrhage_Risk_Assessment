@@ -1,5 +1,6 @@
 import os
 import sys
+import random
 import pandas as pd
 
 from config import PATIENTS_FILE, OUTPUT_CSV
@@ -13,7 +14,8 @@ from pipeline.chain import build_chain, process_patient
 PATIENT_IDS = []
 
 
-def main(patients_file: str = None, patient_ids: list[str] = None, limit: int = None):
+def main(patients_file: str = None, patient_ids: list[str] = None,
+         limit: int = None, randomize: bool = False, seed: int = 42):
     patients_file = patients_file or PATIENTS_FILE
     patient_ids = patient_ids if patient_ids is not None else PATIENT_IDS
 
@@ -30,8 +32,7 @@ def main(patients_file: str = None, patient_ids: list[str] = None, limit: int = 
             print("No matching patients to process.")
             return
 
-    if limit:
-        patients = patients[:limit]
+    patients = select_sample(patients, limit, randomize, seed)
 
     # How many patients does the code resolve on its own vs. need the LLM?
     auto = [p for p in patients if p["insufficient_data"] or p["auto_risk"]]
@@ -80,23 +81,42 @@ def main(patients_file: str = None, patient_ids: list[str] = None, limit: int = 
         print(f"  {level}: {n}")
 
 
+def select_sample(patients, limit, randomize, seed):
+    """Pick which patients to process: a random spread (seeded, reproducible) or the first N."""
+    if not limit or limit >= len(patients):
+        return patients
+    if randomize:
+        rng = random.Random(seed)
+        chosen = rng.sample(patients, limit)
+        # keep original order for stable output
+        order = {id(p): i for i, p in enumerate(patients)}
+        return sorted(chosen, key=lambda p: order[id(p)])
+    return patients[:limit]
+
+
 def _row(patient_id, risk, reasoning):
     return {"patient_id": patient_id, "hemorrhage_risk": risk, "reasoning": reasoning}
 
 
 if __name__ == "__main__":
-    # CLI args (any order): a .xlsx/.csv path sets the data file, a bare integer
-    # caps how many patients to process (handy for testing), anything else is a
-    # patient ID filter. Examples:
+    # CLI args (any order):
+    #   a .xlsx/.csv path      -> data file
+    #   a bare integer         -> cap how many patients to process
+    #   the word "random"      -> take a random sample of that size (else the first N)
+    #   anything else          -> patient ID filter
+    # Examples:
     #   python main.py
-    #   python main.py data/new_data.xlsx 50
-    #   python main.py KCK0033218 KCK0033295
-    file_arg, limit_arg, ids = None, None, []
+    #   python main.py data/mock_data_new.xlsx 300 random   # 300 random patients
+    #   python main.py data/mock_data_new.xlsx 50           # first 50
+    #   python main.py KCK0033218 KCK0033295                # specific patients
+    file_arg, limit_arg, randomize, ids = None, None, False, []
     for arg in sys.argv[1:]:
         if arg.lower().endswith((".xlsx", ".csv")):
             file_arg = arg
         elif arg.isdigit():
             limit_arg = int(arg)
+        elif arg.lower() in ("random", "--random", "--sample"):
+            randomize = True
         else:
             ids.append(arg)
-    main(patients_file=file_arg, patient_ids=ids or None, limit=limit_arg)
+    main(patients_file=file_arg, patient_ids=ids or None, limit=limit_arg, randomize=randomize)
