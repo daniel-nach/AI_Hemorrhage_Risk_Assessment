@@ -147,6 +147,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Large mock datasets (keep the small sample_WONDER_Data.xlsx committed)
+data/mock_data_new.xlsx
+
 # Environments
 .env
 .envrc

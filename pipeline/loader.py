@@ -95,12 +95,14 @@ def _triage(group: pd.DataFrame):
     if has_severe or has_borderline:
         return None, None
 
-    # Free-text/qualitative content -> the code can't judge it; defer to the LLM.
-    if _has_qualitative(group):
+    # Concerning free-text/qualitative content -> defer to the LLM.
+    # (Benign values like "Normal", "Stable", "doing good" are ignored.)
+    if _qualitative_concern(group):
         return None, None
 
-    # A directional trend on a tracked stat is a judgment call -> defer to the LLM.
-    if _has_directional_trend(group):
+    # A directional trend that has reached a near-threshold value -> defer to the LLM.
+    # (Meaningless wiggles well within the normal range are ignored.)
+    if _has_worrying_trend(group):
         return None, None
 
     # A near-threshold value combined with an aggravating factor can justify MEDIUM,
@@ -112,23 +114,50 @@ def _triage(group: pd.DataFrame):
     return "LOW", "all values within normal range; no risk factors or worrying trends"
 
 
-def _has_qualitative(group: pd.DataFrame) -> bool:
+# Words that signal a qualitative note may describe a problem worth the LLM's attention.
+_CONCERN_KEYWORDS = (
+    "anxious", "dizzy", "unwell", "not feeling well", "not feeding", "not bonding",
+    "reluctant", "swollen", "pain", "bleed", "distress", "weak", "pale", "fever",
+    "mass",  # e.g. "palpable mass felt" (negated "no palpable mass" handled below)
+)
+# Reassuring words; a note containing one of these (and no concern keyword) is benign.
+_BENIGN_WORDS = (
+    "good", "well", "stable", "normal", "alert", "orient", "ok", "firm",
+    "happy", "sound", "fine", "calm",
+)
+
+
+def _note_is_concerning(text) -> bool:
+    t = str(text).strip().lower()
+    if not t or t == "nan":
+        return False
+    if "no palpable mass" in t or "no mass" in t:
+        return False
+    if any(k in t for k in _CONCERN_KEYWORDS):
+        return True
+    if any(w in t for w in _BENIGN_WORDS):
+        return False
+    return True  # unrecognised free text -> be safe, let the LLM read it
+
+
+def _qualitative_concern(group: pd.DataFrame) -> bool:
     for col in QUALITATIVE_FIELDS:
-        if col in group.columns and group[col].notna().any():
-            # treat non-empty strings as content
+        if col in group.columns:
             for v in group[col].dropna():
-                if str(v).strip() not in ("", "nan"):
+                if _note_is_concerning(v):
                     return True
     return False
 
 
-def _has_directional_trend(group: pd.DataFrame) -> bool:
+def _has_worrying_trend(group: pd.DataFrame) -> bool:
+    """A directional trend only matters if the latest reading is near/in a concerning range."""
     for col in TREND_FIELDS:
         if col not in group.columns:
             continue
         nums = [n for n in (_f(v) for v in group[col].tolist()) if n is not None]
         if len(nums) >= 2 and trend_direction(nums) in ("rising", "falling"):
-            return True
+            if severity(col, nums[-1]) is not None:  # latest value is edge/borderline/severe
+                return True
     return False
 
 
