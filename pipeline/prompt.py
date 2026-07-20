@@ -115,22 +115,24 @@ Beyond the individual ranges, weigh combinations and the overall picture:
 - Fundal height and weight are mainly useful as trends across visits, not fixed thresholds.
 
 AGGRAVATING / CONTRIBUTING FACTORS
-Some data does not indicate hemorrhage risk directly, but reveals a condition that can WORSEN an
-indicator that does. Use such data to interpret the primary indicators more cautiously — especially
-when a primary value sits at the upper-normal or borderline range.
+GENERAL PRINCIPLE: Examine EVERY piece of data for the patient. For each one, ask yourself: "Could
+this value, condition, or observation influence one of the numbers that drives hemorrhage risk?"
+If yes, factor it into your assessment. This applies to any field in the record — vitals, labs,
+computed values, obstetric measurements, free-text notes, postnatal observations — and to anything
+your trained obstetric knowledge tells you is connected, whether or not it is named below.
 
-Indirect factors — some are already computed for you in the PATIENT-LEVEL FACTS block, others you
-should infer from the data using your medical knowledge:
-- BMI (already computed and labelled). BMI >= 30 = obesity, which predisposes to and worsens
-  hypertension. BMI < 18.5 (underweight) can accompany malnutrition and anemia.
-- Age (already computed). Advanced (>= 40) or very young (<= 17) maternal age raises obstetric risk.
-- Elevated blood glucose (BloodGlucoseLevel, BedSideGlucose) or urine glucose (UrineGlucose) ->
-  possible diabetes / gestational diabetes, which raises the risk of hypertension, preeclampsia,
-  and hemorrhage.
-- Rapid weight gain across visits together with rising BP -> may signal fluid retention / preeclampsia.
-- Anything in the free-text notes or postnatal fields (e.g. general condition, mood, wellbeing,
-  perineum, uterine fundus) that suggests a complicating condition.
-- Any other relationship your obstetric knowledge tells you is relevant, even if not listed here.
+Do not treat the items below as a checklist. They are ILLUSTRATIONS of the kind of reasoning
+expected; the real goal is to catch ANY factor in the data that could move a risk-relevant number:
+- BMI (computed): obesity (>= 30) predisposes to and worsens hypertension; underweight (< 18.5) can
+  accompany malnutrition and anemia.
+- Age (computed): advanced (>= 40) or very young (<= 17) maternal age raises obstetric risk.
+- Elevated blood or urine glucose -> possible diabetes / gestational diabetes, which raises the risk
+  of hypertension, preeclampsia, and hemorrhage.
+- Rapid weight gain across visits with rising BP -> possible fluid retention / preeclampsia.
+- Signs of infection (fever, raised pulse/resp) -> can worsen bleeding and coagulation.
+- Anything in the notes or postnatal fields (general condition, mood, wellbeing, perineum, uterine
+  fundus, urination, etc.) that suggests a complicating condition.
+- Any other physiological relationship you know of that could push a risk-relevant value toward danger.
 
 How to use them (be disciplined — these MODULATE, they do not invent risk):
 - An aggravating factor combined with a BORDERLINE or upper-normal primary value justifies leaning
