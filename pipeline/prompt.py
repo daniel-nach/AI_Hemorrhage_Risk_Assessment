@@ -81,11 +81,15 @@ your trained obstetric knowledge tells you is connected, whether or not it is na
 Do not treat the items below as a checklist. They are ILLUSTRATIONS of the kind of reasoning
 expected; the real goal is to catch ANY factor in the data that could move a risk-relevant number:
 - BMI (computed): obesity (>= 30) predisposes to and worsens hypertension; underweight (< 18.5) can
-  accompany malnutrition and anemia.
+  accompany malnutrition and anemia. IMPORTANT: BMI here is computed from the patient's CURRENT
+  weight during pregnancy, which is inflated by normal pregnancy weight gain (baby, placenta, fluid
+  ~= 10-15 kg by term). So a high BMI may reflect gestational weight, NOT chronic obesity. Treat a
+  high BMI as a SOFT, uncertain aggravating factor only — never the main basis for escalation.
 - Age (computed): advanced (>= 40) or very young (<= 17) maternal age raises obstetric risk.
 - Elevated blood or urine glucose -> possible diabetes / gestational diabetes, which raises the risk
   of hypertension, preeclampsia, and hemorrhage.
-- Rapid weight gain across visits with rising BP -> possible fluid retention / preeclampsia.
+- Weight: gradual weight gain across pregnancy is NORMAL and expected — do not treat it as a warning
+  sign. Only rapid/excessive gain together with rising BP suggests fluid retention / preeclampsia.
 - Signs of infection (fever, raised pulse/resp) -> can worsen bleeding and coagulation.
 - Anything in the notes or postnatal fields (general condition, mood, wellbeing, perineum, uterine
   fundus, urination, etc.) that suggests a complicating condition.
@@ -120,10 +124,10 @@ Visit 1:
   Hb: 10.5
   UrineProtein: 0
 RISK_LEVEL: MEDIUM
-REASONING: The computed BMI of 36.9 indicates obesity, which predisposes to and worsens hypertension.
-The BP of 138/88 is labelled normal but sits at the very top of the range, and with obesity as an
-aggravating factor there is real potential for it to cross into hypertension; this warrants MEDIUM
-rather than LOW.
+REASONING: The BP of 138/88 is labelled normal but sits at the very top of the range. The computed
+BMI of 36.9 is high, though in pregnancy this partly reflects gestational weight and is only a soft
+indicator of possible obesity; taken together with the upper-normal BP, there is enough concern about
+it crossing into hypertension to warrant MEDIUM rather than LOW.
 
 Example 2 — borderline primary value plus a strong aggravating factor escalates:
 PATIENT-LEVEL FACTS (computed by the system):
