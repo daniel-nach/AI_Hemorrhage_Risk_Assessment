@@ -3,7 +3,7 @@ import sys
 import random
 import pandas as pd
 
-from config import PATIENTS_FILE, OUTPUT_CSV
+from config import PATIENTS_FILE, OUTPUT_CSV, BASE_DIR
 from pipeline.loader import load_patients
 from pipeline.prompt import build_prompt
 from pipeline.llm import get_llm
@@ -26,6 +26,9 @@ SAMPLE_SEED = 42            # fixed seed -> reproducible sample
 
 def main(patients_file: str = None, patient_ids: list[str] = None):
     patients_file = patients_file or PATIENTS_FILE
+    # Resolve a relative CLI path against the project folder, not the current dir.
+    if not os.path.isabs(patients_file):
+        patients_file = os.path.join(BASE_DIR, patients_file)
     patient_ids = patient_ids if patient_ids is not None else PATIENT_IDS
 
     print(f"Loading patient data from {patients_file} ...")
@@ -79,7 +82,7 @@ def main(patients_file: str = None, patient_ids: list[str] = None):
             raise
         print(f"Saving {len(results)} completed results...")
 
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(os.path.dirname(OUTPUT_CSV), exist_ok=True)
     df = pd.DataFrame(results)
     df.to_csv(OUTPUT_CSV, index=False)
     print(f"\nDone. Results saved to {OUTPUT_CSV} ({len(results)}/{len(patients)} patients)")
