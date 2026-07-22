@@ -11,5 +11,5 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-PATIENTS_FILE = os.path.join(BASE_DIR, "data", "sample_WONDER_Data.xlsx")
+PATIENTS_FILE = os.path.join(BASE_DIR, "data", "mock_data_new.xlsx")
 OUTPUT_CSV = os.path.join(BASE_DIR, "output", "recommendations.csv")
