@@ -224,22 +224,43 @@ def _compute_age(group: pd.DataFrame):
     return years if 0 < years < 120 else None
 
 
-def _bmi_value(group: pd.DataFrame):
-    """BMI as a float, or None if height/weight unavailable."""
-    h_cm = _f(_latest(group, "Height"))
-    w_kg = _f(_latest(group, "Weight"))
-    if h_cm is None or w_kg is None or h_cm <= 0 or w_kg <= 0:
+def _height_weight_cm_kg(group: pd.DataFrame):
+    """
+    Latest height (cm) and weight (kg), cleaned for the messy real data:
+    heights < 100 are treated as inches and converted; implausible values are
+    rejected so we never compute a nonsense BMI (e.g. from height 0 or weight 6870).
+    Returns (h_cm, w_kg) or None.
+    """
+    h = _f(_latest(group, "Height"))
+    w = _f(_latest(group, "Weight"))
+    if h is None or w is None or h <= 0 or w <= 0:
         return None
-    return w_kg / ((h_cm / 100) ** 2)
+    if h < 100:            # recorded in inches, not cm
+        h = h * 2.54
+    if not (120 <= h <= 220):   # plausible adult height in cm
+        return None
+    if not (30 <= w <= 200):    # plausible adult weight in kg
+        return None
+    return h, w
+
+
+def _bmi_value(group: pd.DataFrame):
+    """BMI as a float, or None if height/weight are unavailable or implausible."""
+    hw = _height_weight_cm_kg(group)
+    if hw is None:
+        return None
+    h_cm, w_kg = hw
+    bmi = w_kg / ((h_cm / 100) ** 2)
+    return bmi if 12 <= bmi <= 60 else None
 
 
 def _compute_bmi(group: pd.DataFrame):
+    hw = _height_weight_cm_kg(group)
     bmi = _bmi_value(group)
-    if bmi is None:
+    if hw is None or bmi is None:
         return None
-    h_cm = _f(_latest(group, "Height"))
-    w_kg = _f(_latest(group, "Weight"))
-    return f"  BMI: {bmi:.1f} (Height {h_cm:g} cm, Weight {w_kg:g} kg) -> {_bmi_category(bmi)}"
+    h_cm, w_kg = hw
+    return f"  BMI: {bmi:.1f} (Height {h_cm:.0f} cm, Weight {w_kg:g} kg) -> {_bmi_category(bmi)}"
 
 
 def _bmi_category(bmi: float) -> str:
