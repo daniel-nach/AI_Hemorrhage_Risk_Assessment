@@ -104,6 +104,19 @@ How to use them (be disciplined — these MODULATE, they do not invent risk):
   Obesity with a perfectly normal BP of 115/72 and normal labs is still LOW.
 - When you use an aggravating factor, state it explicitly in your reasoning (e.g. name the BMI).
 
+PREGNANCY STAGE & GESTATIONAL AGE
+- VisitType is the stage of care: Initial / Prenatal = antenatal (still pregnant);
+  Labor = in labour (at/near term); PostPartum / postpartumreadmission / SixWeek = after delivery.
+- Fundal height (cm) is a rough proxy for gestational age in weeks (e.g. fundal height 32 ~ 32 weeks).
+  Use it, when present, to judge how far along the pregnancy is.
+- Use stage + gestational age to interpret weight/BMI: antenatal weight is inflated by the pregnancy,
+  and MORE so later in gestation (higher fundal height), so discount a high BMI accordingly. After
+  delivery (postpartum visits) the baby's weight is gone, so weight/BMI better reflects the woman's
+  own body and a high value is somewhat more meaningful.
+- Hemorrhage timing: labour and the postpartum period are the highest-risk windows for obstetric
+  (postpartum) hemorrhage. Give a Labor or postpartum visit with any abnormal vitals particular
+  attention — but do not escalate on stage alone.
+
 DATA NOTES
 - Most patients have only vitals recorded; lab values like Hb and platelets are often missing.
 - Notes and qualitative fields are rarely filled in, but when present they may be meaningful — read them.
