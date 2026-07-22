@@ -226,20 +226,23 @@ def _compute_age(group: pd.DataFrame):
 
 def _height_weight_cm_kg(group: pd.DataFrame):
     """
-    Latest height (cm) and weight (kg), cleaned for the messy real data:
-    heights < 100 are treated as inches and converted; implausible values are
-    rejected so we never compute a nonsense BMI (e.g. from height 0 or weight 6870).
+    Latest height (cm) and weight (kg) — but ONLY when the record is unambiguously
+    metric, so we never assert a wrong BMI from unknown units.
+
+    Height is the tell: a value in the adult-cm range (120-220) can only be cm, so
+    the record is metric and weight is kg. A height that is out of that range
+    (recorded in inches, or garbage like 0/16/240) means the unit system is unknown
+    -> we cannot tell whether weight is kg or lb (95 could be 95 kg = obese or
+    95 lb = underweight), so we decline to compute BMI at all.
     Returns (h_cm, w_kg) or None.
     """
     h = _f(_latest(group, "Height"))
     w = _f(_latest(group, "Weight"))
-    if h is None or w is None or h <= 0 or w <= 0:
+    if h is None or w is None:
         return None
-    if h < 100:            # recorded in inches, not cm
-        h = h * 2.54
-    if not (120 <= h <= 220):   # plausible adult height in cm
+    if not (120 <= h <= 220):   # not unambiguously cm -> unit system unknown
         return None
-    if not (30 <= w <= 200):    # plausible adult weight in kg
+    if not (30 <= w <= 200):    # implausible as kg -> unreliable
         return None
     return h, w
 
