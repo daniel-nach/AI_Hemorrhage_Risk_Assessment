@@ -13,14 +13,12 @@ How it works
   hazards come from a published validation study with real hemorrhage OUTCOMES
   across 261,964 deliveries, keyed to low/medium/high risk tiers (see HAZARD
   below). The antenatal hazards remain small approximate placeholders.
-- A patient's hemorrhage probability is the chance of being absorbed into
-  HEMORRHAGE: starting from their reported risk tier (LOW/MEDIUM/HIGH), the tier
-  is projected forward to delivery with the transition matrix, and the peripartum
-  (delivery) hazard is applied ONCE. This keeps the probability consistent with
-  the reported category and monotonic (LOW <= MEDIUM <= HIGH). Because the
-  transition matrix captures that HIGH patients persist in HIGH while MEDIUM
-  rarely reach it, the projection separates the tiers more than the near-equal
-  raw peripartum rates would on their own.
+- A patient's hemorrhage probability = 1 - probability of surviving (no
+  hemorrhage): each of their own antenatal visits contributes a small antepartum
+  hazard (per-patient variation), and the delivery hazard is applied ONCE, keyed
+  to their reported risk tier. HEMORRHAGE is the absorbing state.
+- The state-to-state transition matrix is also estimated and reported as a
+  population-level characterization of how patients move between risk states.
 
 NOTE: the peripartum rates are population averages by risk tier, not validated
 against THIS dataset's outcomes (it has none). Treat the output as a
@@ -32,32 +30,29 @@ from pipeline.classifier import severity
 STATES = ["LOW", "MEDIUM", "HIGH"]
 
 # --- HEMORRHAGE HAZARDS (tunable) ---------------------------------------------
-# Per-step probability of hemorrhage given the visit's risk state.
-#
-# PERIPARTUM (labour/postpartum) hazards use REAL outcome-labelled rates from a
-# validation study of the CMQCC low/medium/high admission risk tiers, which map
-# directly onto our states:
+# PERIPARTUM (delivery) hazard = probability of postpartum hemorrhage by risk
+# tier, applied ONCE per patient at delivery. Anchored to outcome-labelled rates
+# from a validation study of the CMQCC low/medium/high tiers (which map onto our
+# states):
 #   Ruppel H, Liu VX, Gupta NR, et al. "Validation of Postpartum Hemorrhage
 #   Admission Risk Factor Stratification in a Large Obstetrics Population."
 #   Am J Perinatol 2020;38(11):1192-1200.  n = 261,964 deliveries.
-#   Standard PPH (blood loss >= 1000 mL):  low 3.2%, medium 10.5%, high 10.2%.
-#   (Severe-PPH alternative, cleaner gradient: low 0.2%, medium 0.5%, high 1.3%.)
-# The source found medium ~= high for standard PPH (the tool is a weak
-# discriminator, AUC ~0.61); HIGH is nudged just above MEDIUM here so the model
-# stays monotonic. To use the severe-PPH definition instead, swap in
-# {LOW: 0.002, MEDIUM: 0.005, HIGH: 0.013}.
+#   Standard PPH (>= 1000 mL):  low 3.2%, medium 10.5%, high 10.2%.
+#   Severe PPH:                 low 0.2%, medium 0.5%, high 1.3%.
+# The standard-PPH numbers show medium ~= high, but that reflects a KNOWN
+# WEAKNESS of the CMQCC tool (a poor discriminator, AUC ~0.61), not that high-
+# and medium-risk patients truly carry equal risk -- the severe-PPH rates show
+# HIGH is ~2.6x MEDIUM. So LOW and MEDIUM use the standard-PPH rates directly,
+# and HIGH is raised to reflect that gradient. Tune HIGH to taste.
 #
-# ANTENATAL hazards represent antepartum hemorrhage, which is much rarer than PPH
-# and is NOT broken out by these tiers in the source, so these remain small,
-# approximate placeholders — tune if a better source is available.
+# ANTENATAL hazard = per-antenatal-visit antepartum-hemorrhage risk. Antepartum
+# hemorrhage is much rarer and not tier-broken-out in the source, so these are
+# small approximate values; they give modest patient-to-patient variation from
+# each patient's own antenatal trajectory without overriding the delivery tier.
 HAZARD = {
-    "antenatal":  {"LOW": 0.001, "MEDIUM": 0.005, "HIGH": 0.010},
-    "peripartum": {"LOW": 0.032, "MEDIUM": 0.105, "HIGH": 0.110},
+    "antenatal":  {"LOW": 0.001, "MEDIUM": 0.003, "HIGH": 0.006},
+    "peripartum": {"LOW": 0.032, "MEDIUM": 0.105, "HIGH": 0.150},
 }
-
-# If a patient hasn't reached labour/postpartum yet, project this many more
-# antenatal visits before the (always-added) postpartum step.
-FUTURE_ANTENATAL_STEPS = 1
 
 # Fallback transitions if a state is unseen in the data.
 DEFAULT_TRANSITIONS = {
@@ -117,44 +112,24 @@ def estimate_transitions(state_sequences: list[list[str]]) -> dict:
     return trans
 
 
-def tier_probabilities(transitions: dict) -> dict:
+def hemorrhage_probability(recs: list[tuple[str, str]], overall_tier: str) -> float | None:
     """
-    The hemorrhage probability for each risk tier, computed ONCE from the Markov
-    chain and reused for every patient of that tier. This keeps the probability
-    consistent with the reported LOW/MEDIUM/HIGH category and guarantees
-    LOW <= MEDIUM <= HIGH (no more HIGH patients scoring below MEDIUM ones).
-    """
-    vals = {tier: _absorption_probability(tier, transitions) for tier in STATES}
-    # Enforce monotonicity in case a quirky estimated matrix would break it.
-    vals["MEDIUM"] = max(vals["MEDIUM"], vals["LOW"])
-    vals["HIGH"] = max(vals["HIGH"], vals["MEDIUM"])
-    return {k: round(v, 4) for k, v in vals.items()}
+    Per-patient probability of hemorrhage over pregnancy + postpartum.
 
-
-def _absorption_probability(start_tier: str, transitions: dict) -> float:
+    - Each of the patient's own antenatal visits contributes a small antepartum-
+      hemorrhage hazard based on that visit's state (this is where patient-to-
+      patient variation within a tier comes from).
+    - The delivery (peripartum) hemorrhage hazard is applied ONCE, keyed to the
+      patient's reported overall risk tier (LOW/MEDIUM/HIGH) so the number tracks
+      the actual assessed severity rather than a separate per-visit guess.
     """
-    Probability of being absorbed into HEMORRHAGE for a patient currently in
-    `start_tier`: project the tier forward toward delivery with the transition
-    matrix (antenatal steps, each carrying a small antepartum-hemorrhage hazard),
-    then apply the peripartum (delivery) hemorrhage hazard ONCE.
-    """
-    dist = {s: 0.0 for s in STATES}
-    dist[start_tier] = 1.0
+    if overall_tier not in STATES:
+        return None
 
     survival = 1.0
-    for _ in range(FUTURE_ANTENATAL_STEPS):
-        aph = sum(dist[s] * HAZARD["antenatal"][s] for s in STATES)
-        survival *= (1 - aph)
-        dist = _advance(dist, transitions)
+    for state, stage in recs:
+        if stage == "antenatal":
+            survival *= (1 - HAZARD["antenatal"][state])
 
-    pph = sum(dist[s] * HAZARD["peripartum"][s] for s in STATES)   # applied once
-    survival *= (1 - pph)
-    return 1 - survival
-
-
-def _advance(dist: dict, transitions: dict) -> dict:
-    nxt = {s: 0.0 for s in STATES}
-    for s, p in dist.items():
-        for t, q in transitions[s].items():
-            nxt[t] += p * q
-    return nxt
+    survival *= (1 - HAZARD["peripartum"][overall_tier])   # the single delivery event
+    return round(1 - survival, 4)
