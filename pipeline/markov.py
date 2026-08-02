@@ -13,9 +13,14 @@ How it works
   hazards come from a published validation study with real hemorrhage OUTCOMES
   across 261,964 deliveries, keyed to low/medium/high risk tiers (see HAZARD
   below). The antenatal hazards remain small approximate placeholders.
-- A patient's cumulative hemorrhage probability = 1 - probability of surviving
-  (no hemorrhage) across all their observed visits plus a short forward
-  projection to delivery + postpartum if they haven't reached it yet.
+- A patient's hemorrhage probability is the chance of being absorbed into
+  HEMORRHAGE: starting from their reported risk tier (LOW/MEDIUM/HIGH), the tier
+  is projected forward to delivery with the transition matrix, and the peripartum
+  (delivery) hazard is applied ONCE. This keeps the probability consistent with
+  the reported category and monotonic (LOW <= MEDIUM <= HIGH). Because the
+  transition matrix captures that HIGH patients persist in HIGH while MEDIUM
+  rarely reach it, the projection separates the tiers more than the near-equal
+  raw peripartum rates would on their own.
 
 NOTE: the peripartum rates are population averages by risk tier, not validated
 against THIS dataset's outcomes (it has none). Treat the output as a
@@ -112,28 +117,39 @@ def estimate_transitions(state_sequences: list[list[str]]) -> dict:
     return trans
 
 
-def hemorrhage_probability(recs: list[tuple[str, str]], transitions: dict) -> float | None:
-    """Cumulative probability of hemorrhage over pregnancy + postpartum for one patient."""
-    if not recs:
-        return None
+def tier_probabilities(transitions: dict) -> dict:
+    """
+    The hemorrhage probability for each risk tier, computed ONCE from the Markov
+    chain and reused for every patient of that tier. This keeps the probability
+    consistent with the reported LOW/MEDIUM/HIGH category and guarantees
+    LOW <= MEDIUM <= HIGH (no more HIGH patients scoring below MEDIUM ones).
+    """
+    vals = {tier: _absorption_probability(tier, transitions) for tier in STATES}
+    # Enforce monotonicity in case a quirky estimated matrix would break it.
+    vals["MEDIUM"] = max(vals["MEDIUM"], vals["LOW"])
+    vals["HIGH"] = max(vals["HIGH"], vals["MEDIUM"])
+    return {k: round(v, 4) for k, v in vals.items()}
+
+
+def _absorption_probability(start_tier: str, transitions: dict) -> float:
+    """
+    Probability of being absorbed into HEMORRHAGE for a patient currently in
+    `start_tier`: project the tier forward toward delivery with the transition
+    matrix (antenatal steps, each carrying a small antepartum-hemorrhage hazard),
+    then apply the peripartum (delivery) hemorrhage hazard ONCE.
+    """
+    dist = {s: 0.0 for s in STATES}
+    dist[start_tier] = 1.0
 
     survival = 1.0
-    for state, stage in recs:
-        survival *= (1 - HAZARD[stage][state])
+    for _ in range(FUTURE_ANTENATAL_STEPS):
+        aph = sum(dist[s] * HAZARD["antenatal"][s] for s in STATES)
+        survival *= (1 - aph)
+        dist = _advance(dist, transitions)
 
-    reached_peripartum = any(stage == "peripartum" for _, stage in recs)
-    if not reached_peripartum:
-        # Project forward: a few more antenatal visits, then a postpartum step.
-        dist = {s: 0.0 for s in STATES}
-        dist[recs[-1][0]] = 1.0
-        for _ in range(FUTURE_ANTENATAL_STEPS):
-            step_hazard = sum(dist[s] * HAZARD["antenatal"][s] for s in STATES)
-            survival *= (1 - step_hazard)
-            dist = _advance(dist, transitions)
-        pp_hazard = sum(dist[s] * HAZARD["peripartum"][s] for s in STATES)
-        survival *= (1 - pp_hazard)
-
-    return round(1 - survival, 4)
+    pph = sum(dist[s] * HAZARD["peripartum"][s] for s in STATES)   # applied once
+    survival *= (1 - pph)
+    return 1 - survival
 
 
 def _advance(dist: dict, transitions: dict) -> dict:
