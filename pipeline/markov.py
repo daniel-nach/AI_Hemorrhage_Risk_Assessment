@@ -9,29 +9,45 @@ How it works
 - Moving between visits is a Markov step. The state-to-state TRANSITION MATRIX
   is ESTIMATED FROM THE DATA (how often patients move LOW->MEDIUM, etc.).
 - Each step also carries a per-state HEMORRHAGE HAZARD (chance of hemorrhaging
-  that step). HEMORRHAGE is an absorbing state. These hazards CANNOT be learned
-  from this dataset (there are no outcome labels), so they are DOCUMENTED
-  PLACEHOLDER values below, calibrated loosely to the literature and meant to be
-  tuned by the clinician. Postpartum/labour steps carry higher hazards because
-  postpartum hemorrhage is the dominant risk window.
+  that step). HEMORRHAGE is an absorbing state. The peripartum (labour/postpartum)
+  hazards come from a published validation study with real hemorrhage OUTCOMES
+  across 261,964 deliveries, keyed to low/medium/high risk tiers (see HAZARD
+  below). The antenatal hazards remain small approximate placeholders.
 - A patient's cumulative hemorrhage probability = 1 - probability of surviving
   (no hemorrhage) across all their observed visits plus a short forward
   projection to delivery + postpartum if they haven't reached it yet.
 
-IMPORTANT: the output is a MODEL ESTIMATE, not an empirically validated
-probability. Its accuracy depends entirely on the assumed hazards below.
+NOTE: the peripartum rates are population averages by risk tier, not validated
+against THIS dataset's outcomes (it has none). Treat the output as a
+literature-anchored estimate; tune the hazards if better local data exists.
 """
 
 from pipeline.classifier import severity
 
 STATES = ["LOW", "MEDIUM", "HIGH"]
 
-# --- TUNABLE PLACEHOLDER PARAMETERS (edit these) ------------------------------
+# --- HEMORRHAGE HAZARDS (tunable) ---------------------------------------------
 # Per-step probability of hemorrhage given the visit's risk state.
-# Antenatal steps are lower risk; labour/postpartum steps are the danger window.
+#
+# PERIPARTUM (labour/postpartum) hazards use REAL outcome-labelled rates from a
+# validation study of the CMQCC low/medium/high admission risk tiers, which map
+# directly onto our states:
+#   Ruppel H, Liu VX, Gupta NR, et al. "Validation of Postpartum Hemorrhage
+#   Admission Risk Factor Stratification in a Large Obstetrics Population."
+#   Am J Perinatol 2020;38(11):1192-1200.  n = 261,964 deliveries.
+#   Standard PPH (blood loss >= 1000 mL):  low 3.2%, medium 10.5%, high 10.2%.
+#   (Severe-PPH alternative, cleaner gradient: low 0.2%, medium 0.5%, high 1.3%.)
+# The source found medium ~= high for standard PPH (the tool is a weak
+# discriminator, AUC ~0.61); HIGH is nudged just above MEDIUM here so the model
+# stays monotonic. To use the severe-PPH definition instead, swap in
+# {LOW: 0.002, MEDIUM: 0.005, HIGH: 0.013}.
+#
+# ANTENATAL hazards represent antepartum hemorrhage, which is much rarer than PPH
+# and is NOT broken out by these tiers in the source, so these remain small,
+# approximate placeholders — tune if a better source is available.
 HAZARD = {
-    "antenatal":  {"LOW": 0.002, "MEDIUM": 0.010, "HIGH": 0.050},
-    "peripartum": {"LOW": 0.030, "MEDIUM": 0.100, "HIGH": 0.250},
+    "antenatal":  {"LOW": 0.001, "MEDIUM": 0.005, "HIGH": 0.010},
+    "peripartum": {"LOW": 0.032, "MEDIUM": 0.105, "HIGH": 0.110},
 }
 
 # If a patient hasn't reached labour/postpartum yet, project this many more
