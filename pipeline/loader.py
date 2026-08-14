@@ -270,6 +270,8 @@ def _compute_bmi(group: pd.DataFrame):
 
 
 def _bmi_category(bmi: float) -> str:
+    # source: WHO BMI classification (underweight <18.5, normal 18.5-24.9,
+    # overweight 25-29.9, obese >=30). See CITATIONS.md.
     if bmi < 18.5:
         return "underweight"
     if bmi < 25:

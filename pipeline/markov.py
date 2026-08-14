@@ -29,7 +29,7 @@ from pipeline.classifier import severity
 
 STATES = ["LOW", "MEDIUM", "HIGH"]
 
-# --- HEMORRHAGE HAZARDS (tunable) ---------------------------------------------
+# --- HEMORRHAGE HAZARDS (tunable) --- full references in CITATIONS.md ----------
 # PERIPARTUM (delivery) hazard = probability of postpartum hemorrhage by risk
 # tier, applied ONCE per patient at delivery. Anchored to outcome-labelled rates
 # from a validation study of the CMQCC low/medium/high tiers (which map onto our

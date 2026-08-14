@@ -23,8 +23,14 @@ def _f(value):
 
 
 # --- per-field classifiers: return an annotation string, or None for plain-normal ---
+# Threshold sources are noted per function; full references in CITATIONS.md.
+# NOTE: the "normal, upper/lower end" edge bands are a project design choice (used
+# by the aggravating-factor logic), NOT clinical categories from any guideline.
 
 def _hb(v):
+    # source: WHO anaemia-in-pregnancy classification (Hb <11; mild 10-10.9,
+    # moderate 7-9.9, severe <7). Our bands drift slightly lenient vs WHO -- see
+    # CITATIONS.md, section "Known deviations".
     x = _f(v)
     if x is None:
         return None
@@ -40,6 +46,8 @@ def _hb(v):
 
 
 def _sysbp(v):
+    # source: ACOG Practice Bulletin 222 -- hypertension >=140, severe >=160.
+    # (SysBP <90 hypotension and the 130-139 "upper end" edge are project choices.)
     x = _f(v)
     if x is None:
         return None
@@ -57,6 +65,7 @@ def _sysbp(v):
 
 
 def _diabp(v):
+    # source: ACOG Practice Bulletin 222 -- hypertension >=90, severe >=110.
     x = _f(v)
     if x is None:
         return None
@@ -74,6 +83,8 @@ def _diabp(v):
 
 
 def _pulse(v):
+    # source: standard clinical vitals (tachycardia >100-110; pregnancy resting HR
+    # runs higher). Not from a single guideline; see CITATIONS.md.
     x = _f(v)
     if x is None:
         return None
@@ -91,6 +102,7 @@ def _pulse(v):
 
 
 def _o2(v):
+    # source: standard clinical vitals (SpO2 >=95 normal, <92 concerning).
     x = _f(v)
     if x is None:
         return None
@@ -104,6 +116,8 @@ def _o2(v):
 
 
 def _platelet(v):
+    # source: standard thresholds -- thrombocytopenia <150k, severe <100k (also a
+    # HELLP-syndrome criterion).
     x = _f(v)
     if x is None:
         return None
@@ -117,6 +131,8 @@ def _platelet(v):
 
 
 def _urine_protein(v):
+    # source: ACOG Practice Bulletin 222 -- dipstick 2+ proteinuria threshold;
+    # 3+/4+ heavy proteinuria (preeclampsia marker).
     s = str(v).strip().lower()
     if s in ("3+", "4+"):
         return "SEVERE - heavy proteinuria (preeclampsia marker)"
@@ -126,6 +142,7 @@ def _urine_protein(v):
 
 
 def _temp(v):
+    # source: standard clinical vitals -- fever >=100.4 F (38 C).
     x = _f(v)
     if x is None:
         return None
@@ -141,6 +158,7 @@ def _temp(v):
 
 
 def _resp(v):
+    # source: standard clinical vitals -- normal respiratory rate 12-20/min.
     x = _f(v)
     if x is None:
         return None
@@ -154,6 +172,8 @@ def _resp(v):
 
 
 def _blood_loss(v):
+    # source: PPH is defined as >=500 mL (vaginal) / >=1000 mL blood loss
+    # (ACOG / CMQCC). Threshold here approximate; see CITATIONS.md.
     x = _f(v)
     if x is None or x <= 0:
         return None
