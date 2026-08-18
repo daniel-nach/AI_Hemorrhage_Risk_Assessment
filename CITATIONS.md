@@ -33,12 +33,44 @@ Admission Risk Factor Stratification in a Large Obstetrics Population."**
 Used for the peripartum (delivery) hazards: LOW and MEDIUM take the standard-PPH
 rates directly. See §4 for the HIGH value, which is a project extrapolation.
 
-### Low / medium / high risk framework — the risk states our model mirrors
+### Low / medium / high risk framework — the risk tiers the Markov model maps to
 CMQCC (California Maternal Quality Care Collaborative). **Improving Health Care
 Response to Obstetric Hemorrhage Toolkit, Version 3.0** (2022), Appendix K:
 Obstetric Hemorrhage Risk Factor Assessment Screen.
 - https://www.cmqcc.org/resource/improving-health-care-response-obstetric-hemorrhage-toolkit-version-30
 - https://www.cmqcc.org/resource/ob-hemorrhage-toolkit-v30-appendix-k-obstetric-hemorrhage-risk-factor-assessment-screen
+
+### Markov transition probabilities — `pipeline/markov.py`
+The model projects each patient's blood-pressure and anemia state forward to
+delivery. Every transition probability is from a published cohort study:
+
+**Blood-pressure / hypertensive-disease chain** (Normotensive → Gestational HTN
+→ Preeclampsia → Severe Preeclampsia):
+- Normotensive → Gestational HTN **14.6%**, → Preeclampsia **2.1%** (over
+  pregnancy; 80.0% stayed normotensive). *Hypertensive Disorders of Pregnancy.*
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC7720658/
+- Gestational HTN → Preeclampsia **17.1%** (41/240; 15–25% across studies).
+  *Gestational hypertension and progression towards preeclampsia in Northern
+  Ethiopia.* https://pmc.ncbi.nlm.nih.gov/articles/PMC8008690/ · larger cohort:
+  https://www.sciencedirect.com/science/article/abs/pii/S2210778917301265
+- Preeclampsia → Severe features **~5%** (18/359). *Factors Associated with
+  Progression to Preeclampsia with Severe Features.*
+  https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10672209/
+
+**Anemia chain** (None → Mild → Moderate → Severe):
+- Not anemic (T1) → anemic by T3 **7.9%**; prevalence 11.8% → 28.8% across
+  trimesters. *Prevalence and influencing factors of anemia across trimesters.*
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC11034068/ · early-Hb predicts late
+  anemia: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8876051/
+
+### Time discretization — turning cumulative rates into per-patient risk
+The cited rates are cumulative over pregnancy, so they are scaled to the
+pregnancy each patient has left. **Option B (chosen):** scale by the remaining
+fraction of the at-risk window using gestational age (fundal height), assuming a
+constant per-week hazard: `p_remaining = 1 - (1 - p) ** (w/W)`. **Option A
+(documented in `markov.py` for future use):** trimester staging with per-stage
+rates. HDP at-risk window starts at 20 weeks (ACOG PB 222); anemia from ~12
+weeks (matching the T1→T3 cohort measure).
 
 ---
 
@@ -89,19 +121,20 @@ Coded from routine clinical vitals knowledge — `pipeline/classifier.py`:
 
 These should be reviewed / tuned by the clinician:
 
-- **HIGH peripartum hazard = 0.15** (`pipeline/markov.py`). An *extrapolation*,
-  not a published figure. The Ruppel standard-PPH rates put medium ≈ high (10.5 vs
-  10.2), but that reflects a documented weakness of the CMQCC tool as a
-  discriminator (AUC ~0.61); the same study's *severe*-PPH rates show HIGH ≈ 2.6×
-  MEDIUM. HIGH was raised to 0.15 to reflect that true gradient.
-- **Antepartum per-visit hazards** (LOW 0.001, MEDIUM 0.003, HIGH 0.006,
-  `pipeline/markov.py`). Small approximate placeholders; antepartum hemorrhage is
-  rarer than PPH and not tier-broken-out in the source.
+- **HIGH-tier PPH rate = 0.15** (`pipeline/markov.py`, `PPH_RATE`). An
+  *extrapolation*, not a published figure. The Ruppel standard-PPH rates put
+  medium ≈ high (10.5 vs 10.2), but that reflects a documented weakness of the
+  CMQCC tool as a discriminator (AUC ~0.61); the same study's *severe*-PPH rates
+  show HIGH ≈ 2.6× MEDIUM. HIGH was raised to 0.15 to reflect that true gradient.
+- **Constant-per-week-hazard assumption** (option B time scaling). The one
+  modelling assumption layered on top of the cited cumulative rates.
+- **BP and anemia treated as independent** when combining into the joint
+  delivery-state probability. A simplifying assumption.
+- **New-onset anemia modelled as MILD**, and worsening of already-anemic patients
+  held (no cited worsening transition — see deviations below).
 - **"normal, upper/lower end" edge bands** (`pipeline/classifier.py`), e.g. SysBP
   130–139, DiaBP 85–89, pulse 95–100. A design device for the aggravating-factor
   logic — they flag near-threshold values, and are NOT clinical categories.
-- **State transition matrix** (`pipeline/markov.py`). Estimated from the dataset's
-  visit-to-visit state changes, not from literature.
 - **Triage rules and overall pipeline structure** (`pipeline/loader.py`,
   `main.py`). Engineering design.
 
@@ -116,3 +149,11 @@ These should be reviewed / tuned by the clinician:
 - **Trimester-specific anemia cutoffs are not applied.** WHO's 2024 update lowers
   the second-trimester anemia cutoff to 10.5 g/dL; the code uses the single 11.0
   cutoff for all trimesters.
+- **Anemia worsening transitions are not modelled.** Only new onset (None → Mild,
+  7.9%) is cited; progression of an already-anemic patient (Mild → Moderate, etc.)
+  lacks a reliable published rate, so those states are held in `markov.py`.
+- **Markov probability reflects only BP + anemia progression.** Pulse, platelets,
+  and O2 have no cited pregnancy-progression rates, so they are not in the Markov
+  chain — they inform the categorical risk assessment instead. So a patient rated
+  HIGH for a non-modelled reason (e.g. tachycardia) may carry a modest Markov
+  probability; the two columns measure related but different things.

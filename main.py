@@ -8,7 +8,6 @@ from pipeline.loader import load_patients
 from pipeline.prompt import build_prompt
 from pipeline.llm import get_llm
 from pipeline.chain import build_chain, process_patient
-from pipeline.markov import estimate_transitions, hemorrhage_probability
 
 
 # Leave empty to run all patients, or list specific IDs to run only those.
@@ -34,10 +33,6 @@ def main(patients_file: str = None, patient_ids: list[str] = None):
 
     print(f"Loading patient data from {patients_file} ...")
     patients = load_patients(patients_file)
-
-    # Estimate the Markov transition matrix from the WHOLE dataset (data-driven).
-    # Reported as a population-level view of how risk states move between visits.
-    transitions = estimate_transitions([[s for s, _ in p["markov_visits"]] for p in patients])
 
     if patient_ids:
         patients = [p for p in patients if p["patient_id"] in patient_ids]
@@ -69,11 +64,11 @@ def main(patients_file: str = None, patient_ids: list[str] = None):
                                     "recorded across any visit.", prob=None))
                 continue
 
+            prob = patient["hemorrhage_probability"]   # Markov estimate from BP + anemia states
+
             if patient["auto_risk"]:
-                risk = patient["auto_risk"]
-                results.append(_row(patient_id, risk,
-                                    f"Decided in code: {patient['auto_reason']}.",
-                                    hemorrhage_probability(patient["markov_visits"], risk)))
+                results.append(_row(patient_id, patient["auto_risk"],
+                                    f"Decided in code: {patient['auto_reason']}.", prob))
                 continue
 
             if chain is None:
@@ -82,10 +77,7 @@ def main(patients_file: str = None, patient_ids: list[str] = None):
 
             print(f"  -> LLM: {patient_id} ({i + 1}/{len(patients)})")
             assessment = process_patient(chain, patient)
-            # Markov hemorrhage probability keyed to the reported tier (pure code, no LLM cost).
-            risk = assessment["risk_level"]
-            results.append(_row(patient_id, risk, assessment["reasoning"],
-                                hemorrhage_probability(patient["markov_visits"], risk)))
+            results.append(_row(patient_id, assessment["risk_level"], assessment["reasoning"], prob))
     except Exception as e:
         print(f"\nStopped at patient {i + 1}/{len(patients)}: {e}")
         if not results:
@@ -102,13 +94,10 @@ def main(patients_file: str = None, patient_ids: list[str] = None):
     for level, n in counts.items():
         print(f"  {level}: {n}")
 
-    df["_p"] = pd.to_numeric(df["hemorrhage_probability"], errors="coerce")
-    print("\nHemorrhage probability by tier (Markov model estimate):")
-    for tier in ("LOW", "MEDIUM", "HIGH"):
-        vals = df.loc[df["hemorrhage_risk"] == tier, "_p"].dropna()
-        if not vals.empty:
-            print(f"  {tier}: median {vals.median():.1%}  (range {vals.min():.1%}-{vals.max():.1%})")
-    df.drop(columns="_p", inplace=True)
+    probs = pd.to_numeric(df["hemorrhage_probability"], errors="coerce").dropna()
+    if not probs.empty:
+        print("\nHemorrhage probability (Markov model, from BP + anemia projection):")
+        print(f"  min {probs.min():.1%}, median {probs.median():.1%}, max {probs.max():.1%}")
 
 
 def _needs_llm(p):

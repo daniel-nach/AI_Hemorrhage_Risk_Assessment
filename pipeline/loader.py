@@ -1,7 +1,9 @@
 import pandas as pd
 
 from pipeline.classifier import classify, severity, trend_direction, TREND_FIELDS, _f
-from pipeline.markov import visit_records
+from pipeline.markov import (
+    current_bp_state, current_anemia_state, estimate_ga, hemorrhage_probability,
+)
 
 # Pure identifiers / administrative fields with no clinical value — excluded.
 # Everything else in the file (including Notes and postnatal fields) is passed to the AI.
@@ -53,14 +55,22 @@ def load_patients(file_path: str) -> list[dict]:
             for col in CRITICAL_FIELDS
         )
         auto_risk, auto_reason = (None, None) if not has_data else _triage(group)
-        markov_visits = visit_records(group)   # [(state, stage), ...] for the Markov model
+
+        # Markov hemorrhage probability from the patient's BP + anemia states,
+        # projected to delivery (pure code, cited transitions -- see markov.py).
+        bp_state = current_bp_state(
+            _latest(group, "SysBP"), _latest(group, "DiaBP"), _latest(group, "UrineProtein"))
+        anemia_state = current_anemia_state(_latest(group, "Hb"))
+        ga = estimate_ga(_latest(group, "FundalHeight"))
+        prob = hemorrhage_probability(bp_state, anemia_state, ga)
+
         patients.append({
             "patient_id": patient_no,
             "summary": summary,
             "insufficient_data": not has_data,
             "auto_risk": auto_risk,      # 'LOW' / 'HIGH' decided in code, or None -> needs LLM
             "auto_reason": auto_reason,
-            "markov_visits": markov_visits,
+            "hemorrhage_probability": prob,
         })
 
     return patients
