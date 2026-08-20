@@ -76,9 +76,11 @@ weeks (matching the T1→T3 cohort measure).
 
 ## 2. Standard authoritative thresholds — `pipeline/classifier.py`, `pipeline/loader.py`
 
-### Hemoglobin / anemia in pregnancy — `_hb()`
+### Hemoglobin / anemia in pregnancy — `anemia_severity()`
 **WHO** haemoglobin classification for anaemia in pregnancy: anemia <11 g/dL;
-mild 10–10.9, moderate 7–9.9, severe <7.0.
+mild 10–10.9, moderate 7–9.9, severe <7.0. Implemented in one shared function,
+`classifier.anemia_severity()`, used by BOTH the value labeller (`_hb`) and the
+Markov model (`markov.current_anemia_state`) so they cannot disagree.
 - https://dhsprogram.com/data/Guide-to-DHS-Statistics/Anemia_Status.htm
 - FIGO 2025 good-practice recommendations (discuss WHO thresholds):
   https://obgyn.onlinelibrary.wiley.com/doi/full/10.1002/ijgo.70529
@@ -142,10 +144,6 @@ These should be reviewed / tuned by the clinician:
 
 ## Known deviations from the cited sources
 
-- **Hemoglobin bands run slightly lenient vs WHO.** The code labels Hb 9–9.9 as
-  "mild" (WHO: moderate) and 10–10.9 as "normal, lower end" (WHO: mild anemia). To
-  conform strictly to WHO, shift `_hb()` in `pipeline/classifier.py` so 7–9.9 is
-  moderate and 10–10.9 is mild.
 - **Trimester-specific anemia cutoffs are not applied.** WHO's 2024 update lowers
   the second-trimester anemia cutoff to 10.5 g/dL; the code uses the single 11.0
   cutoff for all trimesters.

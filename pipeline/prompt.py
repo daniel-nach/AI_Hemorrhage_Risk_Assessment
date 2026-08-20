@@ -134,7 +134,7 @@ VISIT HISTORY:
 Visit 1:
   SysBP: 138.0 [normal, upper end]
   DiaBP: 88.0 [normal, upper end]
-  Hb: 10.5
+  Hb: 11.8
   UrineProtein: 0
 RISK_LEVEL: MEDIUM
 REASONING: The BP of 138/88 is labelled normal but sits at the very top of the range. The computed
@@ -151,7 +151,7 @@ Visit 1:
   SysBP: 144.0 [BORDERLINE - hypertension]
   DiaBP: 92.0 [BORDERLINE - hypertension]
   BloodGlucoseLevel: 190.0
-  Hb: 10.8
+  Hb: 11.6
 RISK_LEVEL: HIGH
 REASONING: BP of 144/92 is labelled borderline hypertension, and the elevated blood glucose (190)
 points to diabetes/gestational diabetes — a strong aggravating factor that compounds hypertensive and

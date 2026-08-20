@@ -27,21 +27,40 @@ def _f(value):
 # NOTE: the "normal, upper/lower end" edge bands are a project design choice (used
 # by the aggravating-factor logic), NOT clinical categories from any guideline.
 
-def _hb(v):
-    # source: WHO anaemia-in-pregnancy classification (Hb <11; mild 10-10.9,
-    # moderate 7-9.9, severe <7). Our bands drift slightly lenient vs WHO -- see
-    # CITATIONS.md, section "Known deviations".
-    x = _f(v)
+def anemia_severity(hb):
+    """
+    WHO anaemia-in-pregnancy severity from hemoglobin (g/dL). SINGLE SOURCE OF
+    TRUTH for anemia banding -- both this classifier and the Markov model
+    (markov.current_anemia_state) call this, so they can never disagree.
+    source: WHO -- anemia <11; mild 10.0-10.9, moderate 7.0-9.9, severe <7.0.
+    Returns 'severe' / 'moderate' / 'mild' / None (None = normal or no value).
+    """
+    x = _f(hb)
     if x is None:
         return None
     if x < 7:
+        return "severe"
+    if x < 10:      # WHO moderate: 7.0-9.9
+        return "moderate"
+    if x < 11:      # WHO mild: 10.0-10.9
+        return "mild"
+    return None     # >= 11: normal for pregnancy
+
+
+def _hb(v):
+    # WHO bands via anemia_severity(). moderate/severe -> SEVERE tier (real
+    # hemorrhage risk factor); mild -> BORDERLINE; 11.0-11.5 flagged as a near-
+    # threshold edge for the aggravating-factor logic only.
+    sev = anemia_severity(v)
+    if sev == "severe":
         return "SEVERE - severe anemia"
-    if x < 9:
+    if sev == "moderate":
         return "SEVERE - moderate anemia"
-    if x < 10:
+    if sev == "mild":
         return "BORDERLINE - mild anemia"
-    if x < 11:
-        return "normal, lower end (borderline-mild anemia)"
+    x = _f(v)
+    if x is not None and x < 11.5:
+        return "normal, lower end"
     return None
 
 

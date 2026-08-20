@@ -48,7 +48,7 @@ categorical risk assessment, not this probability. The probability here is
 specifically the hypertensive-/anemia-progression-driven hemorrhage risk.
 """
 
-from pipeline.classifier import _f
+from pipeline.classifier import _f, anemia_severity
 
 # --- Timing assumptions (option B) --- see CITATIONS.md -----------------------
 TERM_WEEKS = 40.0
@@ -141,17 +141,12 @@ def current_bp_state(sysbp, diabp, urine_protein) -> str | None:
 
 
 def current_anemia_state(hb) -> str | None:
-    """Classify current anemia severity from latest Hb (WHO pregnancy cutoffs)."""
-    x = _f(hb)
-    if x is None:
+    """Current anemia state from latest Hb. Uses the shared WHO banding in
+    classifier.anemia_severity so this and the classifier can never disagree."""
+    if _f(hb) is None:
         return None
-    if x < 7:
-        return "SEVERE"
-    if x < 10:      # WHO moderate 7.0-9.9
-        return "MODERATE"
-    if x < 11:      # WHO mild 10.0-10.9
-        return "MILD"
-    return "NONE"
+    sev = anemia_severity(hb)   # 'severe' / 'moderate' / 'mild' / None
+    return {"severe": "SEVERE", "moderate": "MODERATE", "mild": "MILD"}.get(sev, "NONE")
 
 
 def hemorrhage_probability(bp_state, anemia_state, ga) -> float | None:
